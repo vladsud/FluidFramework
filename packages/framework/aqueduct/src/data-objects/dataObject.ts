@@ -19,7 +19,7 @@ import { RequestParser } from "@fluidframework/runtime-utils";
 import { FluidObjectHandle } from "@fluidframework/datastore";
 
 import { BlobHandle } from "./blobHandle";
-import { PureDataObject } from "./pureDataObject";
+import { PureDataObject, DataObjectInitializationState } from "./pureDataObject";
 
 /**
  * DataObject is a base data store that is primed with a root directory and task manager. It
@@ -77,6 +77,9 @@ export abstract class DataObject<O extends IFluidObject = object, S = undefined,
      *                 data object load.
      */
     public createLoadableObject<T extends IFluidObject>(path: string, object: T): T & IFluidLoadable {
+        // Can be safely called only from preInitialize()!
+        assert(this.initState === DataObjectInitializationState.NotInitialized);
+
         assert(object.IFluidLoadable === undefined);
         assert((object as any).handle === undefined);
         assert(path.indexOf("/") === -1);

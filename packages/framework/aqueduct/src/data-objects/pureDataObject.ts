@@ -32,6 +32,13 @@ export interface IDataObjectProps<O = object, S = undefined> {
     readonly initProps?: S;
 }
 
+export enum DataObjectInitializationState {
+    NotInitialized,
+    PreInitialized,
+    initialized,
+    PostInitialied
+}
+
 /**
  * This is a bare-bones base class that does basic setup and enables for factory on an initialize call.
  * You probably don't want to inherit from this data store directly unless
@@ -79,6 +86,8 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
     public get IFluidRouter() { return this; }
     public get IFluidLoadable() { return this; }
     public get IFluidHandle() { return this.innerHandle; }
+
+    protected initState = DataObjectInitializationState.NotInitialized;
 
     /**
      * Handle to a data store
@@ -169,13 +178,18 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
      */
     public async initializeInternal(): Promise<void> {
         await this.preInitialize();
+        this.initState = DataObjectInitializationState.PreInitialized;
+
         if (this.runtime.existing) {
             assert(this.initProps === undefined);
             await this.initializingFromExisting();
         } else {
             await this.initializingFirstTime(this.context.createProps as S ?? this.initProps);
         }
+
+        this.initState = DataObjectInitializationState.initialized;
         await this.hasInitialized();
+        this.initState = DataObjectInitializationState.PostInitialied;
     }
 
     /**
