@@ -142,7 +142,7 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
                 value: this,
             };
         }
-        return { status: 404, mimeType: "text/plain", value: `${req.url} not found` };
+        return { status: 404, mimeType: "text/plain", value: `unknown request url: ${req.url}` };
     }
 
     // #endregion IFluidRouter
