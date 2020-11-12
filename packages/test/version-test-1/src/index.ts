@@ -6,15 +6,13 @@
 import {
     ContainerRuntimeFactoryWithDefaultDataStore,
 } from "@fluidframework/aqueduct";
-import { createNamedDataStore } from "@fluidframework/runtime-utils";
+import { createDataStoreFactory } from "@fluidframework/runtime-utils";
 
 import { VersiontestInstantiationFactory } from "./main";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-const pkg = require("../package.json");
-const fluidPackageName = pkg.name as string;
+const fluidPackageName = "@fluid-internal/version-test-1";
 
-const defaultFactory = createNamedDataStore(fluidPackageName, VersiontestInstantiationFactory);
+const defaultFactory = createDataStoreFactory(fluidPackageName, VersiontestInstantiationFactory);
 
 export const fluidExport = new ContainerRuntimeFactoryWithDefaultDataStore(
     defaultFactory,

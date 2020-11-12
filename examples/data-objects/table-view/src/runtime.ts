@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { createNamedDelayedDataStore } from "@fluidframework/runtime-utils";
+import { createDataStoreFactory } from "@fluidframework/runtime-utils";
 import { ContainerRuntimeFactoryWithDefaultDataStore } from "@fluidframework/aqueduct";
 import { IRuntimeFactory } from "@fluidframework/container-definitions";
 import { tableViewType } from "./tableview";
 
-const factory = createNamedDelayedDataStore(
+const factory = createDataStoreFactory(
     tableViewType,
     // eslint-disable-next-line max-len
     import(/* webpackChunkName: "table-view", webpackPreload: true */ "./tableview").then((m) => m.TableView.getFactory()));

@@ -30,6 +30,7 @@ import {
     IContainerRuntimeBase,
     IContainerRuntimeBaseEvents,
     IFluidDataStoreContextDetached,
+    IProvideFluidDataStoreRegistry,
  } from "@fluidframework/runtime-definitions";
 import { IProvideContainerRuntimeDirtyable } from "./containerRuntimeDirtyable";
 
@@ -54,6 +55,7 @@ export type IContainerRuntimeBaseWithCombinedEvents =
  */
 export interface IContainerRuntime extends
     Partial<IProvideContainerRuntimeDirtyable>,
+    IProvideFluidDataStoreRegistry,
     IContainerRuntimeBaseWithCombinedEvents {
     readonly id: string;
     readonly existing: boolean;
@@ -96,10 +98,12 @@ export interface IContainerRuntime extends
     createRootDataStore(pkg: string | string[], rootDataStoreId: string): Promise<IFluidRouter>;
 
     /**
-     * Creates detached data store context. only after context.attachRuntime() is called,
-     * data store initialization is considered compete.
+     * Creates detached data store context. Data store initialization is considered compete
+     * only after context.attachRuntime() is called.
+     * @param pkg - package path
+     * @param rootDataStoreId - data store ID (unique name)
      */
-    createRootDetachedDataStore(pkg: Readonly<string[]>, rootDataStoreId: string): IFluidDataStoreContextDetached;
+    createDetachedRootDataStore(pkg: Readonly<string[]>, rootDataStoreId: string): IFluidDataStoreContextDetached;
 
     /**
      * Used to raise an unrecoverable error on the runtime.

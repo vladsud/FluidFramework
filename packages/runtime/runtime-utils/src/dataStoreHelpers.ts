@@ -11,7 +11,8 @@ import {
 } from "@fluidframework/core-interfaces";
 import {
     IFluidDataStoreFactory,
-    FluidDataStoreRegistryEntry,
+    IFluidDataStoreRegistry,
+    IProvideFluidDataStoreRegistry,
 } from "@fluidframework/runtime-definitions";
 
 export async function requestFluidObject<T = IFluidObject>(
@@ -27,27 +28,18 @@ export async function requestFluidObject<T = IFluidObject>(
     return response.value as T;
 }
 
-// eslint-disable-next-line prefer-arrow/prefer-arrow-functions
-export function createNamedDataStore<T extends FluidDataStoreRegistryEntry>(
-    type: string,
-    factory: T)
-{
-    return Object.create(factory, { type: { value: type, writable: false } }) as
-        T & { type: string };
-}
+export type Factory = IFluidDataStoreFactory & Partial<IProvideFluidDataStoreRegistry>;
 
-// eslint-disable-next-line prefer-arrow/prefer-arrow-functions
-export function createNamedDelayedDataStore(
+export function createDataStoreFactory(
     type: string,
-    factory: Promise<IFluidDataStoreFactory>): IFluidDataStoreFactory
+    factory: Factory | Promise<Factory>,
+    ): IFluidDataStoreFactory & IFluidDataStoreRegistry
 {
     return {
         type,
         get IFluidDataStoreFactory() { return this; },
-        instantiateDataStore: async (context) => {
-            const f = await factory;
-            assert(f.type === type, "Type mismatch");
-            return f.instantiateDataStore(context);
-        },
+        get IFluidDataStoreRegistry() { return this; },
+        instantiateDataStore: async (context) => (await factory).instantiateDataStore(context),
+        get: async (name: string) => (await factory).IFluidDataStoreRegistry?.get(name),
     };
 }

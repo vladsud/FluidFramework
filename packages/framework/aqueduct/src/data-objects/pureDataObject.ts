@@ -52,7 +52,7 @@ export enum DataObjectInitializationState {
 // eslint-disable-next-line @typescript-eslint/ban-types
 export abstract class PureDataObject<O extends IFluidObject = object, S = undefined, E extends IEvent = IEvent>
     extends EventForwarder<E>
-    implements IFluidLoadable, IFluidRouter, IProvideFluidHandle {
+    implements IFluidLoadable, IFluidRouter, IProvideFluidHandle, IFluidObject {
     private readonly innerHandle: IFluidHandle<this>;
     private _disposed = false;
 
@@ -142,7 +142,11 @@ export abstract class PureDataObject<O extends IFluidObject = object, S = undefi
                 value: this,
             };
         }
-        return { status: 404, mimeType: "text/plain", value: `unknown request url: ${req.url}` };
+        return {
+            mimeType: "text/plain",
+            status: 404,
+            value: `unknown request url: ${req.url}`,
+        };
     }
 
     // #endregion IFluidRouter

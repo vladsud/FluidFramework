@@ -8,7 +8,7 @@ import { IRequest, IFluidObject, IFluidRouter } from "@fluidframework/core-inter
 import {
     FluidDataStoreRuntime,
     ISharedObjectRegistry,
-    requestFluidDataStoreMixin,
+    mixinRequestHandler,
  } from "@fluidframework/datastore";
 import { IEvent } from "@fluidframework/common-definitions";
 import { FluidDataStoreRegistry } from "@fluidframework/container-runtime";
@@ -39,7 +39,7 @@ import {
 /*
  * Useful interface in places where it's useful to do type erasure for PureDataObject generic
  */
-export interface RootDataObjectFactory extends IFluidDataStoreFactory {
+export interface IRootDataObjectFactory extends IFluidDataStoreFactory {
     createRootInstance(
         rootDataStoreId: string,
         runtime: IContainerRuntime,
@@ -131,22 +131,22 @@ async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E ex
     context: IFluidDataStoreContext,
     sharedObjectRegistry: ISharedObjectRegistry,
     optionalProviders: FluidObjectSymbolProvider<O>,
-    runtimeFactoryArg: typeof FluidDataStoreRuntime,
+    runtimeClassArg: typeof FluidDataStoreRuntime,
     dependencies?: IFluidDependencyProvider,
     initProps?: S)
 {
     // base
-    let runtimeFactory = runtimeFactoryArg;
+    let runtimeClass = runtimeClassArg;
 
     // request mixin in
-    runtimeFactory = requestFluidDataStoreMixin(
-        runtimeFactory,
+    runtimeClass = mixinRequestHandler(
         async (request: IRequest, runtimeArg: FluidDataStoreRuntime) =>
-            (await PureDataObject.getDataObject(runtimeArg)).request(request));
+            (await PureDataObject.getDataObject(runtimeArg)).request(request),
+            runtimeClass);
 
     // Create a new runtime for our data store
     // The runtime is what Fluid uses to create DDS' and route to your data store
-    const runtime = new runtimeFactory(
+    const runtime = new runtimeClass(
         context,
         sharedObjectRegistry,
     );
@@ -188,7 +188,7 @@ async function createDataObject<TObj extends PureDataObject<O, S, E>, O, S, E ex
  * E - represents events that will be available in the EventForwarder
  */
 export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E extends IEvent = IEvent>
-    implements IFluidDataStoreFactory, Partial<IProvideFluidDataStoreRegistry>, RootDataObjectFactory
+    implements IFluidDataStoreFactory, Partial<IProvideFluidDataStoreRegistry>, IRootDataObjectFactory
 {
     private readonly sharedObjectRegistry: ISharedObjectRegistry;
     private readonly registry: IFluidDataStoreRegistry | undefined;
@@ -199,7 +199,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
         sharedObjects: readonly IChannelFactory[],
         private readonly optionalProviders: FluidObjectSymbolProvider<O>,
         registryEntries?: NamedFluidDataStoreRegistryEntries,
-        private readonly runtimeCtor: typeof FluidDataStoreRuntime = FluidDataStoreRuntime,
+        private readonly runtimeClass: typeof FluidDataStoreRuntime = FluidDataStoreRuntime,
     ) {
         if (this.type === "") {
             throw new Error("undefined type member");
@@ -237,7 +237,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
             context,
             this.sharedObjectRegistry,
             this.optionalProviders,
-            this.runtimeCtor);
+            this.runtimeClass);
 
         return runtime;
     }
@@ -326,7 +326,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
         dependencies?: IFluidDependencyProvider,
         initialState?: S,
     ): Promise<TObj> {
-        const context = runtime.createRootDetachedDataStore([this.type], rootDataStoreId);
+        const context = runtime.createDetachedRootDataStore([this.type], rootDataStoreId);
         return this.createInstanceCore(context, initialState, dependencies);
     }
 
@@ -350,7 +350,7 @@ export class PureDataObjectFactory<TObj extends PureDataObject<O, S, E>, O, S, E
             context,
             this.sharedObjectRegistry,
             this.optionalProviders,
-            this.runtimeCtor,
+            this.runtimeClass,
             dependencies,
             initialState);
 

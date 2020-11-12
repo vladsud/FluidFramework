@@ -12,7 +12,7 @@ import {
 } from "@fluidframework/container-definitions";
 import { IFluidCodeDetails, IProvideFluidCodeDetailsComparer } from "@fluidframework/core-interfaces";
 import { IProvideFluidDataStoreFactory, IProvideFluidDataStoreRegistry } from "@fluidframework/runtime-definitions";
-import { createNamedDataStore } from "@fluidframework/runtime-utils";
+import { createDataStoreFactory } from "@fluidframework/runtime-utils";
 
 export type SupportedExportInterfaces = Partial<
     IProvideRuntimeFactory &
@@ -51,7 +51,7 @@ export class LocalCodeLoader implements ICodeLoader {
                     fluidModule = { fluidExport: maybeExport };
                 } else {
                     assert(maybeExport.IFluidDataStoreFactory !== undefined);
-                    const defaultFactory = createNamedDataStore("default", maybeExport.IFluidDataStoreFactory);
+                    const defaultFactory = createDataStoreFactory("default", maybeExport.IFluidDataStoreFactory);
                     fluidModule = {
                         fluidExport: {
                             ... maybeExport,
