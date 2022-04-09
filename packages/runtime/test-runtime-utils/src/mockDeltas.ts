@@ -41,11 +41,16 @@ export class MockDeltaQueue<T> extends EventEmitter implements IDeltaQueue<T> {
         return this.queue.length === 0;
     }
 
+    /** Synchronous way to pump tasks */
+    public processTasks() {
+        while (this.pauseCount === 0 && this.length > 0) {
+            this.processCallback(this.pop());
+        }
+    }
+
     protected process() {
         void Promise.resolve().then(() => {
-            while (this.pauseCount === 0 && this.length > 0) {
-                this.processCallback(this.pop());
-            }
+            this.processTasks();
         });
     }
 

@@ -72,6 +72,7 @@ declare function get_old_ClassDeclaration_ContainerRuntime():
 declare function use_current_ClassDeclaration_ContainerRuntime(
     use: TypeOnly<current.ContainerRuntime>);
 use_current_ClassDeclaration_ContainerRuntime(
+    // @ts-expect-error compatibility expected to be broken
     get_old_ClassDeclaration_ContainerRuntime());
 
 /*
@@ -1445,6 +1446,7 @@ declare function get_old_ClassDeclaration_ScheduleManager():
 declare function use_current_ClassDeclaration_ScheduleManager(
     use: TypeOnly<current.ScheduleManager>);
 use_current_ClassDeclaration_ScheduleManager(
+    // @ts-expect-error compatibility expected to be broken
     get_old_ClassDeclaration_ScheduleManager());
 
 /*
@@ -1457,6 +1459,7 @@ declare function get_current_ClassDeclaration_ScheduleManager():
 declare function use_old_ClassDeclaration_ScheduleManager(
     use: TypeOnly<old.ScheduleManager>);
 use_old_ClassDeclaration_ScheduleManager(
+    // @ts-expect-error compatibility expected to be broken
     get_current_ClassDeclaration_ScheduleManager());
 
 /*

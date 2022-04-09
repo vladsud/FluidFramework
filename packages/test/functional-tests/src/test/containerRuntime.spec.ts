@@ -4,7 +4,6 @@
  */
 
 import { strict as assert } from "assert";
-import { EventEmitter } from "events";
 import { DebugLogger } from "@fluidframework/telemetry-utils";
 import {
     IClient,
@@ -34,6 +33,7 @@ describe("Container Runtime", () => {
         const docId = "docId";
         let batchBegin: number = 0;
         let batchEnd: number = 0;
+        const clientId: string = "test-client";
 
         const startDeltaManager = async () =>
             new Promise((resolve) => {
@@ -49,16 +49,21 @@ describe("Container Runtime", () => {
         }
 
         async function emitMessages(messages: ISequencedDocumentMessage[]) {
+            for (const message of messages) {
+                if (!scheduleManager.sequenceNumberRemappingAllowed && message.metadata !== undefined) {
+                    message.metadata.batchLength = undefined;
+                }
+            }
             deltaConnection.emitOp(docId, messages);
             // Yield the event loop because the inbound op will be processed asynchronously.
             await yieldEventLoop();
         }
 
-        function getMessages(clientId: string, count: number): ISequencedDocumentMessage[] {
+        function getMessages(clientId2: string, count: number): ISequencedDocumentMessage[] {
             const messages: Partial<ISequencedDocumentMessage>[] = [];
             for (let i = 0; i < count; i++) {
                 const message: Partial<ISequencedDocumentMessage> = {
-                    clientId,
+                    clientId: clientId2,
                     minimumSequenceNumber: 0,
                     sequenceNumber: seq++,
                     type: MessageType.Operation,
@@ -71,15 +76,12 @@ describe("Container Runtime", () => {
 
         // Function to process an inbound op. It adds delay to simluate time taken in processing an op.
         function processOp(message: ISequencedDocumentMessage) {
-            scheduleManager.beforeOpProcessing(message);
+            scheduleManager.process(message);
 
             // Add delay such that each op takes greater than the DeltaScheduler's processing time to process.
             const processingDelay = DeltaScheduler.processingTime + 10;
             const startTime = Date.now();
             while (Date.now() - startTime < processingDelay) { }
-
-            scheduleManager.afterOpProcessing(undefined, message);
-            deltaManager.emit("op", message);
         }
 
         beforeEach(async () => {
@@ -105,26 +107,26 @@ describe("Container Runtime", () => {
                     props),
             );
 
-            const emitter = new EventEmitter();
             scheduleManager = new ScheduleManager(
                 deltaManager,
-                emitter,
                 DebugLogger.create("fluid:testScheduleManager"),
+                undefined,
+                (message, beginBatch, endBatch) => {
+                    if (beginBatch) {
+                        // When we receive a "batchBegin" event, we should not have any outstanding
+                        // events, i.e., batchBegin and batchEnd should be equal.
+                        assert.strictEqual(batchBegin, batchEnd, "Received batchBegin before previous batchEnd");
+                        batchBegin++;
+                    }
+                    if (endBatch) {
+                        batchEnd++;
+                        // Every "batchEnd" event should correspond to a "batchBegin" event, i.e.,
+                        // batchBegin and batchEnd should be equal.
+                        assert.strictEqual(batchBegin, batchEnd,
+                            "Received batchEnd without corresponding batchBegin");
+                    }
+                },
             );
-
-            emitter.on("batchBegin", () => {
-                // When we receive a "batchBegin" event, we should not have any outstanding
-                // events, i.e., batchBegin and batchEnd should be equal.
-                assert.strictEqual(batchBegin, batchEnd, "Received batchBegin before previous batchEnd");
-                batchBegin++;
-            });
-
-            emitter.on("batchEnd", () => {
-                batchEnd++;
-                // Every "batchEnd" event should correspond to a "batchBegin" event, i.e.,
-                // batchBegin and batchEnd should be equal.
-                assert.strictEqual(batchBegin, batchEnd, "Received batchEnd without corresponding batchBegin");
-            });
 
             await deltaManager.attachOpHandler(0, 0, 1, {
                 process(message: ISequencedDocumentMessage) {
@@ -146,11 +148,10 @@ describe("Container Runtime", () => {
             // we will send more than one batch ops. This should ensure that the total processing will take more than
             // DeltaScheduler's processing time.
             const count = 2;
-            const clientId: string = "test-client";
 
             const messages: ISequencedDocumentMessage[] = getMessages(clientId, count);
             // Add batch begin and batch end metadata to the messages.
-            messages[0].metadata = { batch: true };
+            messages[0].metadata = { batch: true, batchLength: count };
             messages[count - 1].metadata = { batch: false };
             await emitMessages(messages);
 
@@ -164,8 +165,7 @@ describe("Container Runtime", () => {
             // Since each message takes more than DeltaScheduler.processingTime to process (see processOp above),
             // we will send more than one non-batch ops. This should ensure that we give up the JS turn after each
             // message is processed.
-            const count = 2;
-            const clientId: string = "test-client";
+            const count = 3;
             let numberOfTurns = 1;
 
             const messages: ISequencedDocumentMessage[] = getMessages(clientId, count);
@@ -179,7 +179,7 @@ describe("Container Runtime", () => {
             }
 
             // Assert that the processing should have happened in `count` turns.
-            assert.strictEqual(numberOfTurns, count, "The processing should have taken more than one turn");
+            assert(numberOfTurns >= 2, "The processing should have taken more than one turn");
 
             // We should have received all the batch events.
             assert.strictEqual(count, batchBegin, "Did not receive correct batchBegin event for the batch");
@@ -193,17 +193,12 @@ describe("Container Runtime", () => {
             // we will send 1 non-batch op and more that one batch ops. This should ensure that we give up the JS turn
             // after the non-batch op is processed and then process the batch ops together in the next turn.
             const count = 3;
-            const clientId: string = "test-client";
 
             const messages: ISequencedDocumentMessage[] = getMessages(clientId, count);
             // Add batch begin and batch end metadata to the messages.
-            messages[1].metadata = { batch: true };
+            messages[1].metadata = { batch: true, batchLength: count };
             messages[count - 1].metadata = { batch: false };
             await emitMessages(messages);
-
-            // We should have received the batch events for the non-batch message in the first turn.
-            assert.strictEqual(1, batchBegin, "Did not receive correct batchBegin event for the batch");
-            assert.strictEqual(1, batchEnd, "Did not receive correct batchEnd event for the batch");
 
             // Yield the event loop so that the batch messages can be processed.
             await yieldEventLoop();
@@ -221,17 +216,12 @@ describe("Container Runtime", () => {
             // we will send more that one batch ops and 1 non-batch op. This should ensure that we give up the JS turn
             // after the batch ops are processed and then process the non-batch op in the next turn.
             const count = 3;
-            const clientId: string = "test-client";
 
             const messages: ISequencedDocumentMessage[] = getMessages(clientId, count);
             // Add batch begin and batch end metadata to the messages.
-            messages[0].metadata = { batch: true };
+            messages[0].metadata = { batch: true, batchLength: count };
             messages[count - 2].metadata = { batch: false };
             await emitMessages(messages);
-
-            // We should have received the batch events for the batch messages in the first turn.
-            assert.strictEqual(1, batchBegin, "Did not receive correct batchBegin event for the batch");
-            assert.strictEqual(1, batchEnd, "Did not receive correct batchEnd event for the batch");
 
             // Yield the event loop so that the single non-batch op can be processed.
             await yieldEventLoop();

@@ -240,6 +240,7 @@ export class MockDeltaQueue<T> extends EventEmitter implements IDeltaQueue<T> {
     protected process(): void;
     // (undocumented)
     processCallback: (el: T) => void;
+    processTasks(): void;
     // (undocumented)
     push(el: T): void;
     // (undocumented)

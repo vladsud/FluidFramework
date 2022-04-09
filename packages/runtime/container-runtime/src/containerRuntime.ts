@@ -4,7 +4,6 @@
  */
 // See #9219
 /* eslint-disable max-lines */
-import { EventEmitter } from "events";
 import { ITelemetryBaseLogger, ITelemetryGenericEvent, ITelemetryLogger } from "@fluidframework/common-definitions";
 import {
     FluidObject,
@@ -26,6 +25,9 @@ import {
     AttachState,
     ILoaderOptions,
     LoaderHeader,
+    IDeltaManagerEvents,
+    IDeltaQueue,
+    ReadOnlyInfo,
 } from "@fluidframework/container-definitions";
 import {
     IContainerRuntime,
@@ -36,7 +38,7 @@ import {
     Trace,
     TypedEventEmitter,
     unreachableCase,
-    performance,
+    EventForwarder,
 } from "@fluidframework/common-utils";
 import {
     ChildLogger,
@@ -54,7 +56,6 @@ import {
     DataCorruptionError,
     GenericError,
     UsageError,
-    extractSafePropertiesFromMessage,
 } from "@fluidframework/container-utils";
 import {
     IClientDetails,
@@ -67,6 +68,7 @@ import {
     ISummaryTree,
     MessageType,
     SummaryType,
+    IClientConfiguration,
 } from "@fluidframework/protocol-definitions";
 import {
     FlushMode,
@@ -108,7 +110,7 @@ import { FluidDataStoreRegistry } from "./dataStoreRegistry";
 import { Summarizer } from "./summarizer";
 import { SummaryManager } from "./summaryManager";
 import { DeltaScheduler } from "./deltaScheduler";
-import { ReportOpPerfTelemetry, latencyThreshold } from "./connectionTelemetry";
+import { ReportOpPerfTelemetry } from "./connectionTelemetry";
 import { IPendingLocalState, PendingStateManager } from "./pendingStateManager";
 import { pkgVersion } from "./packageVersion";
 import { BlobManager, IBlobManagerLoadInfo } from "./blobManager";
@@ -117,6 +119,7 @@ import {
     aliasBlobName,
     blobsTreeName,
     chunksBlobName,
+    batchBlobName,
     electedSummarizerBlobName,
     extractSummaryMetadataMessage,
     IContainerRuntimeMetadata,
@@ -154,6 +157,11 @@ import {
 } from "./dataStore";
 import { BindBatchTracker } from "./batchTracker";
 import { OpTracker } from "./opTelemetry";
+
+interface IScheduleManagerSerialized {
+    sequenceNumber: number,
+    state: [string, {length?: number, messages: ISequencedDocumentMessage[]}][],
+}
 
 export enum ContainerMessageType {
     // An op to be delivered to store
@@ -307,6 +315,7 @@ export interface IContainerRuntimeOptions {
 
 type IRuntimeMessageMetadata = undefined | {
     batch?: boolean;
+    batchLength?: number;
 };
 
 /**
@@ -402,20 +411,78 @@ export function unpackRuntimeMessage(message: ISequencedDocumentMessage) {
 }
 
 /**
- * This class controls pausing and resuming of inbound queue to ensure that we never
- * start processing ops in a batch IF we do not have all ops in the batch.
+ * This class has the following responsibilities:
+ * 1. It tracks batches as we process ops and raises "batchBegin" and "batchEnd" events.
+ *    As part of it, it validates batch correctness (i.e. no system ops in the middle of batch)
+ * 2. It creates instance of ScheduleManagerCore that ensures we never start processing ops from batch
+ *    unless all ops of the batch are in.
  */
-class ScheduleManagerCore {
-    private pauseSequenceNumber: number | undefined;
-    private currentBatchClientId: string | undefined;
-    private localPaused = false;
-    private timePaused = 0;
+export class ScheduleManager extends EventForwarder<IDeltaManagerEvents>
+implements IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
+    // Controls if we expect other clients to break batches on the wire
+    // Mostly used for testing. Should be deployed with 'true' setting for a while before feature can be enabled
+    public readonly sequenceNumberRemappingAllowed = false;
+    // Controls enabling of a feature - tells this client to submit batches as individual ops (i.e. break the batch)
+    // Can only be enabled after previous setting is On in prod for a while
+    // It's not enough to change that value, one needs to make appropriate change in DeltaManager.flush() to break a
+    // batch into smaller chunks. We still might want to submit batches together in most cases for efficiency, but
+    // enabling this feature allows break up and simplification of protocol.
+    // WARNING: That said, any API that has sequenceNumber should be re-evaluated, as different layers
+    // (runtime vs. loader) will have different interpretation of them, and we can't allow mixing them!
+    private readonly sequenceNumberRemappingEnabled = false;
+
+    private readonly deltaScheduler: DeltaScheduler;
+    private hitError = false;
+    private seqNumber: number;
     private batchCount = 0;
+
+    private readonly pending: Map<string, {length?: number, messages: ISequencedDocumentMessage[]}> = new Map();
+
+    public readonly inbound: IDeltaQueue<ISequencedDocumentMessage>;
+    public readonly outbound: IDeltaQueue<IDocumentMessage[]>;
+    public readonly inboundSignal: IDeltaQueue<ISignalMessage>;
+
+    public readonly initialSequenceNumber: number;
+    public lastMessage: ISequencedDocumentMessage | undefined = undefined;
+    private lastProcessedSeqNumber: number;
+
+    private legacyBatchClientId: string | undefined;
 
     constructor(
         private readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
         private readonly logger: ITelemetryLogger,
+        state: IScheduleManagerSerialized | undefined,
+        private readonly processCallback: (
+            message: ISequencedDocumentMessage,
+            beginBatch: boolean,
+            endBatch: boolean) => void,
     ) {
+        super(deltaManager);
+
+        // Setup IDeltaManager interface
+        this.inbound = deltaManager.inbound;
+        this.outbound = deltaManager.outbound;
+        this.inboundSignal = deltaManager.inboundSignal;
+
+        if (state === undefined) {
+            this.seqNumber = 0;
+            this.pending = new Map();
+        } else {
+            assert(this.sequenceNumberRemappingAllowed, "remapping enabled");
+            this.seqNumber = state.sequenceNumber;
+            this.pending = new Map(state.state);
+        }
+
+        this.initialSequenceNumber = this.seqNumber;
+        this.lastProcessedSeqNumber = this.seqNumber;
+
+        // By that time this object needs to be fully setup,
+        // as DeltaScheduler may call into IDeltaManager
+        this.deltaScheduler = new DeltaScheduler(
+            this, // deltaManager
+            ChildLogger.create(this.logger, "DeltaScheduler"),
+        );
+
         // Listen for delta manager sends and add batch metadata to messages
         this.deltaManager.on("prepareSend", (messages: IDocumentMessage[]) => {
             if (messages.length === 0) {
@@ -436,241 +503,230 @@ class ScheduleManagerCore {
 
             // Set the batch flag to false on the last message to indicate the end of the send batch
             const lastMessage = messages[messages.length - 1];
+            if (this.sequenceNumberRemappingEnabled) {
+                firstMessageMetadata.batchLength = messages.length;
+            }
             lastMessage.metadata = { ...lastMessage.metadata, batch: false };
         });
-
-        // Listen for updates and peek at the inbound
-        this.deltaManager.inbound.on(
-            "push",
-            (message: ISequencedDocumentMessage) => {
-                this.trackPending(message);
-            });
-
-        // Start with baseline - empty inbound queue.
-        assert(!this.localPaused, 0x293 /* "initial state" */);
-
-        const allPending = this.deltaManager.inbound.toArray();
-        for (const pending of allPending) {
-            this.trackPending(pending);
-        }
-
-        // We are intentionally directly listening to the "op" to inspect system ops as well.
-        // If we do not observe system ops, we are likely to hit 0x296 assert when system ops
-        // precedes start of incomplete batch.
-        this.deltaManager.on("op", (message) => this.afterOpProcessing(message.sequenceNumber));
     }
 
-    /**
-     * The only public function in this class - called when we processed an op,
-     * to make decision if op processing should be paused or not afer that.
+    public get IDeltaSender(): IDeltaSender {
+        return this;
+    }
+
+    public get minimumSequenceNumber(): number {
+        return this.lastMessage?.minimumSequenceNumber ?? this.deltaManager.minimumSequenceNumber;
+    }
+
+    public get lastSequenceNumber(): number {
+        return this.lastMessage?.sequenceNumber ?? this.initialSequenceNumber;
+    }
+
+    public get lastKnownSeqNumber() {
+        return this.deltaManager.lastKnownSeqNumber;
+    }
+
+    public get hasCheckpointSequenceNumber() {
+        return this.deltaManager.hasCheckpointSequenceNumber;
+    }
+
+    public get clientDetails(): IClientDetails {
+        return this.deltaManager.clientDetails;
+    }
+
+    public get version(): string {
+        return this.deltaManager.version;
+    }
+
+    public get maxMessageSize(): number {
+        return this.deltaManager.maxMessageSize;
+    }
+
+    public get serviceConfiguration(): IClientConfiguration | undefined {
+        return this.deltaManager.serviceConfiguration;
+    }
+
+    public get active(): boolean {
+        return this.deltaManager.active;
+    }
+
+    public get readOnlyInfo(): ReadOnlyInfo {
+        return this.deltaManager.readOnlyInfo;
+    }
+
+    public dispose(): void {
+        this.inbound.dispose();
+        this.outbound.dispose();
+        this.inboundSignal.dispose();
+        super.dispose();
+    }
+
+    public close(): void {
+        return this.deltaManager.close();
+    }
+
+    public submitSignal(content: any): void {
+        return this.deltaManager.submitSignal(content);
+    }
+
+    public flush(): void {
+        return this.deltaManager.flush();
+    }
+
+    /*
+     * Serialize state of this class for summary
+     * constructor will receive same state when loading from summary
      */
-     public afterOpProcessing(sequenceNumber: number) {
-        assert(!this.localPaused, 0x294 /* "can't have op processing paused if we are processing an op" */);
-
-        // If the inbound queue is ever empty, nothing to do!
-        if (this.deltaManager.inbound.length === 0) {
-            assert(this.pauseSequenceNumber === undefined,
-                0x295 /* "there should be no pending batch if we have no ops" */);
-            return;
+    public serialize(): IScheduleManagerSerialized | undefined {
+        if (this.sequenceNumberRemappingEnabled) {
+            return {
+                sequenceNumber: this.seqNumber,
+                state: [...this.pending],
+            };
         }
-
-        // The queue is
-        // 1. paused only when the next message to be processed is the beginning of a batch. Done in two places:
-        //    - here (processing ops until reaching start of incomplete batch)
-        //    - in trackPending(), when queue was empty and start of batch showed up.
-        // 2. resumed when batch end comes in (in trackPending())
-
-        // do we have incomplete batch to worry about?
-        if (this.pauseSequenceNumber !== undefined) {
-            assert(sequenceNumber < this.pauseSequenceNumber,
-                0x296 /* "we should never start processing incomplete batch!" */);
-            // If the next op is the start of incomplete batch, then we can't process it until it's fully in - pause!
-            if (sequenceNumber + 1 === this.pauseSequenceNumber) {
-                this.pauseQueue();
-            }
-        }
+        return undefined;
     }
 
-    private pauseQueue() {
-        assert(!this.localPaused, 0x297 /* "always called from resumed state" */);
-        this.localPaused = true;
-        this.timePaused = performance.now();
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.deltaManager.inbound.pause();
-    }
-
-    private resumeQueue(startBatch: number, messageEndBatch: ISequencedDocumentMessage) {
-        const endBatch = messageEndBatch.sequenceNumber;
-        const duration = performance.now() - this.timePaused;
-
-        this.batchCount++;
-        if (this.batchCount % 1000 === 1) {
-            this.logger.sendTelemetryEvent({
-                eventName: "BatchStats",
-                sequenceNumber: endBatch,
-                length: endBatch - startBatch + 1,
-                msnDistance: endBatch - messageEndBatch.minimumSequenceNumber,
-                duration,
-                batchCount: this.batchCount,
-                interrupted: this.localPaused,
-            });
-        }
-
-        // Return early if no change in value
-        if (!this.localPaused) {
-            return;
-        }
-
-        this.localPaused = false;
-
-        // Random round number - we want to know when batch waiting paused op processing.
-        if (duration > latencyThreshold) {
-            this.logger.sendErrorEvent({
-                eventName: "MaxBatchWaitTimeExceeded",
-                duration,
-                sequenceNumber: endBatch,
-                length: endBatch - startBatch,
-            });
-        }
-        this.deltaManager.inbound.resume();
-    }
-
-    /**
-     * Called for each incoming op (i.e. inbound "push" notification)
+    /*
+     * Called when client is removed from quorum
+     * We clear all state tracking about this client, as client will resubmit ops on connection.
      */
-    private trackPending(message: ISequencedDocumentMessage) {
-        assert(this.deltaManager.inbound.length !== 0,
-            0x298 /* "we have something in the queue that generates this event" */);
-
-        assert((this.currentBatchClientId === undefined) === (this.pauseSequenceNumber === undefined),
-            0x299 /* "non-synchronized state" */);
-
-        const metadata = message.metadata as IRuntimeMessageMetadata;
-        const batchMetadata = metadata?.batch;
-
-        // Protocol messages are never part of a runtime batch of messages
-        if (!isRuntimeMessage(message)) {
-            // Protocol messages should never show up in the middle of the batch!
-            assert(this.currentBatchClientId === undefined, 0x29a /* "System message in the middle of batch!" */);
-            assert(batchMetadata === undefined, 0x29b /* "system op in a batch?" */);
-            assert(!this.localPaused, 0x29c /* "we should be processing ops when there is no active batch" */);
-            return;
-        }
-
-        if (this.currentBatchClientId === undefined && batchMetadata === undefined) {
-            assert(!this.localPaused, 0x29d /* "we should be processing ops when there is no active batch" */);
-            return;
-        }
-
-        // If the client ID changes then we can move the pause point. If it stayed the same then we need to check.
-        // If batchMetadata is not undefined then if it's true we've begun a new batch - if false we've ended
-        // the previous one
-        if (this.currentBatchClientId !== undefined || batchMetadata === false) {
-            if (this.currentBatchClientId !== message.clientId) {
-                // "Batch not closed, yet message from another client!"
-                throw new DataCorruptionError(
-                    "OpBatchIncomplete",
-                    {
-                        batchClientId: this.currentBatchClientId,
-                        ...extractSafePropertiesFromMessage(message),
-                    });
-            }
-        }
-
-        // The queue is
-        // 1. paused only when the next message to be processed is the beginning of a batch. Done in two places:
-        //    - in afterOpProcessing() - processing ops until reaching start of incomplete batch
-        //    - here (batchMetadata == false below), when queue was empty and start of batch showed up.
-        // 2. resumed when batch end comes in (batchMetadata === true case below)
-
-        if (batchMetadata) {
-            assert(this.currentBatchClientId === undefined, 0x29e /* "there can't be active batch" */);
-            assert(!this.localPaused, 0x29f /* "we should be processing ops when there is no active batch" */);
-            this.pauseSequenceNumber = message.sequenceNumber;
-            this.currentBatchClientId = message.clientId;
-            // Start of the batch
-            // Only pause processing if queue has no other ops!
-            // If there are any other ops in the queue, processing will be stopped when they are processed!
-            if (this.deltaManager.inbound.length === 1) {
-                this.pauseQueue();
-            }
-        } else if (batchMetadata === false) {
-            assert(this.pauseSequenceNumber !== undefined, 0x2a0 /* "batch presence was validated above" */);
-            // Batch is complete, we can process it!
-            this.resumeQueue(this.pauseSequenceNumber, message);
-            this.pauseSequenceNumber = undefined;
-            this.currentBatchClientId = undefined;
-        } else {
-            // Continuation of current batch. Do nothing
-            assert(this.currentBatchClientId !== undefined, 0x2a1 /* "logic error" */);
-        }
-    }
-}
-
-/**
- * This class has the following responsibilities:
- * 1. It tracks batches as we process ops and raises "batchBegin" and "batchEnd" events.
- *    As part of it, it validates batch correctness (i.e. no system ops in the middle of batch)
- * 2. It creates instance of ScheduleManagerCore that ensures we never start processing ops from batch
- *    unless all ops of the batch are in.
- */
-export class ScheduleManager {
-    private readonly deltaScheduler: DeltaScheduler;
-    private batchClientId: string | undefined;
-    private hitError = false;
-
-    constructor(
-        private readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>,
-        private readonly emitter: EventEmitter,
-        private readonly logger: ITelemetryLogger,
-    ) {
-        this.deltaScheduler = new DeltaScheduler(
-            this.deltaManager,
-            ChildLogger.create(this.logger, "DeltaScheduler"),
-        );
-        void new ScheduleManagerCore(deltaManager, logger);
-    }
-
-    public beforeOpProcessing(message: ISequencedDocumentMessage) {
-        if (this.batchClientId !== message.clientId) {
-            assert(this.batchClientId === undefined,
-                0x2a2 /* "Batch is interrupted by other client op. Should be caught by trackPending()" */);
-
-            // This could be the beginning of a new batch or an individual message.
-            this.emitter.emit("batchBegin", message);
-            this.deltaScheduler.batchBegin();
-
-            const batch = (message?.metadata as IRuntimeMessageMetadata)?.batch;
-            if (batch) {
-                this.batchClientId = message.clientId;
-            } else {
-                this.batchClientId = undefined;
-            }
+    public removeClient(clientId: string) {
+        assert(this.legacyBatchClientId !== clientId, "Legacy batches were not submitted in one go");
+        // Client needs to resend whole sequence, we have no ability to "follow" clients across re-connections.
+        // Even if we did, client maybe gone forever.
+        const data = this.pending.get(clientId);
+        if (data !== undefined) {
+            assert(this.sequenceNumberRemappingAllowed, "remapping enabled");
+            // Can skip some number of sequence numbers...
+            this.seqNumber += data.messages.length;
+            this.pending.delete(clientId);
         }
     }
 
-    public afterOpProcessing(error: any | undefined, message: ISequencedDocumentMessage) {
+    /*
+     * An op came in and runtime is asked to process it.
+     * We will examine if this op completes a batch, and if so, will process it.
+     * Otherwise we will keep accumulating ops for incomplete batch.
+     */
+    public process(message: ISequencedDocumentMessage) {
         // If this is no longer true, we need to revisit what we do where we set this.hitError.
         assert(!this.hitError, 0x2a3 /* "container should be closed on any error" */);
 
-        if (error) {
-            // We assume here that loader will close container and stop processing all future ops.
-            // This is implicit dependency. If this flow changes, this code might no longer be correct.
-            this.hitError = true;
-            this.batchClientId = undefined;
-            this.emitter.emit("batchEnd", error, message);
-            this.deltaScheduler.batchEnd();
+        // Keep track of ops that we never saw, like system ops.
+        // Advance seq number to stay current
+        // This is important to keep MSN correct, otherwise we will quickly run into situations
+        // where MSN > Seq# on an op!
+        assert(message.sequenceNumber > this.lastProcessedSeqNumber, "ordering");
+        this.seqNumber += (message.sequenceNumber - this.lastProcessedSeqNumber - 1);
+        this.lastProcessedSeqNumber = message.sequenceNumber;
+
+        const clientId = message.clientId;
+
+        // assert(this.legacyBatch || !this.sequenceNumberRemappingEnabled)
+        assert(this.legacyBatchClientId === undefined || this.legacyBatchClientId === clientId,
+            "legacy batch is broken");
+
+        const data = this.pending.get(clientId);
+
+        // Today we only process runtime messages in container runtime.
+        // But if we ever change that, this logic should be fine, but we do not expect system messages to
+        // ever be part of batch!
+        assert(isRuntimeMessage(message) || message.metadata?.batch === undefined && data === undefined,
+            "system messages can't be part of batch!");
+
+        if (message.metadata?.batch === true) {
+            // Start of a batch. There should be no partial batch from this client
+            assert(data === undefined, "two batches from same client?");
+            const batchLength = message.metadata?.batchLength;
+            assert(batchLength === undefined || typeof batchLength === "number", "no batchLength");
+            assert(this.sequenceNumberRemappingAllowed || batchLength === undefined,
+                "Breaking batches not enabled yet");
+            this.pending.set(clientId, {length: batchLength, messages: [message]});
+            if (batchLength === undefined) {
+                this.legacyBatchClientId = clientId;
+            }
             return;
         }
 
-        const batch = (message?.metadata as IRuntimeMessageMetadata)?.batch;
-        // If no batchClientId has been set then we're in an individual batch. Else, if we get
-        // batch end metadata, this is end of the current batch.
-        if (this.batchClientId === undefined || batch === false) {
-            this.batchClientId = undefined;
-            this.emitter.emit("batchEnd", undefined, message);
-            this.deltaScheduler.batchEnd();
+        if (data === undefined) {
+            // No pending batch from this client, and this is not start of a batch.
+            // It should be no-batch op
+            assert(message.metadata?.batch === undefined, "End of batch when there is no batch?");
+            this.release([message]);
             return;
+        }
+
+        // sequence numbers should be continuous
+        const messages = data.messages;
+        let length = messages.length;
+        assert(this.sequenceNumberRemappingEnabled ||
+            messages[length - 1].sequenceNumber + 1 === message.sequenceNumber,
+            "Gap in batch");
+
+        messages.push(message);
+        length++;
+
+        if (message.metadata?.batch === false) {
+            // It's the end of the batch. Process full batch.
+            assert(data.length === undefined || data.length === length,
+                "length does not match");
+            this.pending.delete(clientId);
+            this.release(data.messages);
+            this.legacyBatchClientId = undefined;
+        } else {
+            // The only remaining case - it's an op in the middle of existing batch.
+            assert(data.length === undefined || data.length > length, "length does not match");
+        }
+    }
+
+    /**
+     * Release full batch for processing
+     * @param messages - batch of ops
+     */
+    private release(messages: ISequencedDocumentMessage[]) {
+        try {
+            const last = messages.length - 1;
+
+            this.batchCount++;
+            if (this.batchCount % 1000 === 1) {
+                const messageEndBatch = messages[last];
+                const endBatch = messageEndBatch.sequenceNumber;
+                this.logger.sendTelemetryEvent({
+                    eventName: "BatchStats",
+                    sequenceNumber: endBatch,
+                    length: messages.length,
+                    msnDistance: endBatch - messageEndBatch.minimumSequenceNumber,
+                    batchCount: this.batchCount,
+                });
+            }
+
+            // in case exception is thrown or re-entrancy happens
+            // It's reset at the end
+            this.hitError = true;
+            this.deltaScheduler.batchBegin();
+
+            let index = 0;
+            for (const message of messages) {
+                assert(message.sequenceNumber > this.seqNumber, "seq");
+                this.seqNumber++;
+
+                if (!this.sequenceNumberRemappingAllowed) {
+                    assert(message.sequenceNumber === this.seqNumber, "no remapping should be required!");
+                } else {
+                    message.sequenceNumber = this.seqNumber;
+                }
+
+                // MSN should stay in valid range!
+                assert(message.minimumSequenceNumber < message.sequenceNumber, "msn");
+
+                this.lastMessage = message;
+                this.processCallback(message, index === 0, index === last);
+                index++;
+            }
+            this.hitError = false;
+        } finally {
+            this.deltaScheduler.batchEnd();
         }
     }
 }
@@ -759,7 +815,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             // BlobAggregationStorage is smart enough for double-wrapping to be no-op
             if (context.attachState === AttachState.Attached) {
                 // IContainerContext storage api return type still has undefined in 0.39 package version.
-                // So once we release 0.40 container-defn package we can remove this check.
+                // So once we release 0.40 container-definitions package we can remove this check.
                 assert(context.storage !== undefined, 0x1f4 /* "Attached state should have storage" */);
                 const aggrStorage = BlobAggregationStorage.wrap(
                     context.storage,
@@ -786,11 +842,12 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             }
         };
 
-        const [chunks, metadata, electedSummarizerData, aliases] = await Promise.all([
+        const [chunks, metadata, electedSummarizerData, aliases, batches] = await Promise.all([
             tryFetchBlob<[string, string[]][]>(chunksBlobName),
             tryFetchBlob<IContainerRuntimeMetadata>(metadataBlobName),
             tryFetchBlob<ISerializedElection>(electedSummarizerBlobName),
             tryFetchBlob<[string, string][]>(aliasBlobName),
+            tryFetchBlob<IScheduleManagerSerialized>(batchBlobName),
         ]);
 
         const loadExisting = existing === true || context.existing === true;
@@ -809,7 +866,8 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         // Verify summary runtime sequence number matches protocol sequence number.
         const runtimeSequenceNumber = metadata?.message?.sequenceNumber;
         if (runtimeSequenceNumber !== undefined) {
-            const protocolSequenceNumber = context.deltaManager.initialSequenceNumber;
+            // These checks neeed to happen after wrapping of DM happened in constructor
+            const protocolSequenceNumber = batches?.sequenceNumber ?? context.deltaManager.initialSequenceNumber;
             // Unless bypass is explicitly set, then take action when sequence numbers mismatch.
             if (loadSequenceNumberVerification !== "bypass" && runtimeSequenceNumber !== protocolSequenceNumber) {
                 // "Load from summary, runtime metadata sequenceNumber !== initialSequenceNumber"
@@ -834,6 +892,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             electedSummarizerData,
             chunks ?? [],
             aliases ?? [],
+            batches,
             {
                 summaryOptions,
                 gcOptions,
@@ -865,7 +924,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     }
 
     public get deltaManager(): IDeltaManager<ISequencedDocumentMessage, IDocumentMessage> {
-        return this.context.deltaManager;
+        return this.scheduleManager;
     }
 
     public get storage(): IDocumentStorageService {
@@ -1027,6 +1086,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         electedSummarizerData: ISerializedElection | undefined,
         chunks: [string, string[]][],
         dataStoreAliasMap: [string, string][],
+        batches: IScheduleManagerSerialized | undefined,
         private readonly runtimeOptions: Readonly<Required<IContainerRuntimeOptions>>,
         private readonly containerScope: FluidObject,
         public readonly logger: ITelemetryLogger,
@@ -1074,6 +1134,14 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.mc.config.getNumber(maxConsecutiveReconnectsKey) ?? this.defaultMaxConsecutiveReconnects;
 
         this._flushMode = runtimeOptions.flushMode;
+
+        this.scheduleManager = new ScheduleManager(
+            context.deltaManager,
+            ChildLogger.create(this.logger, "ScheduleManager"),
+            batches,
+            (message, beginBatch, endBatch) => this.processCore(message, beginBatch, endBatch),
+        );
+
         this.garbageCollector = GarbageCollector.create(
             this,
             this.runtimeOptions.gcOptions,
@@ -1155,12 +1223,6 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             this.logger,
         );
 
-        this.scheduleManager = new ScheduleManager(
-            context.deltaManager,
-            this,
-            ChildLogger.create(this.logger, "ScheduleManager"),
-        );
-
         this.deltaSender = this.deltaManager;
 
         this.pendingStateManager = new PendingStateManager(
@@ -1170,6 +1232,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             context.pendingLocalState as IPendingLocalState);
 
         this.context.quorum.on("removeMember", (clientId: string) => {
+            this.scheduleManager.removeClient(clientId);
             this.clearPartialChunks(clientId);
         });
 
@@ -1192,14 +1255,14 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             const orderedClientLogger = ChildLogger.create(this.logger, "OrderedClientElection");
             const orderedClientCollection = new OrderedClientCollection(
                 orderedClientLogger,
-                this.context.deltaManager,
+                this.deltaManager,
                 this.context.quorum,
             );
             const orderedClientElectionForSummarizer = new OrderedClientElection(
 
                 orderedClientLogger,
                 orderedClientCollection,
-                electedSummarizerData ?? this.context.deltaManager.lastSequenceNumber,
+                electedSummarizerData ?? this.deltaManager.lastSequenceNumber,
                 SummarizerClientElection.isClientEligible,
             );
             const summarizerClientElectionEnabled =
@@ -1484,6 +1547,12 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             const electedSummarizerContent = JSON.stringify(this.summarizerClientElection?.serialize());
             addBlobToSummary(summaryTree, electedSummarizerBlobName, electedSummarizerContent);
         }
+
+        const scheduleContent = this.scheduleManager.serialize();
+        if (scheduleContent !== undefined) {
+            addBlobToSummary(summaryTree, batchBlobName, JSON.stringify(scheduleContent));
+        }
+
         const snapshot = this.blobManager.snapshot();
 
         // Some storage (like git) doesn't allow empty tree, so we can omit it.
@@ -1578,12 +1647,15 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     private readonly onOp = (op: ISequencedDocumentMessage) => {
         assert(!this.paused, 0x128 /* "Container should not already be paused before applying stashed ops" */);
         this.paused = true;
+        // This flow needs to be reconsidered.
+        // Does it have to be async? If not, remove pause/resume flow
+        // If it needs to be async, then DM wrapper need to implement pause/resume semantics
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.context.deltaManager.inbound.pause();
+        this.deltaManager.inbound.pause();
         const stashP = this.pendingStateManager.applyStashedOpsAt(op.sequenceNumber);
         stashP.then(() => {
             this.paused = false;
-            this.context.deltaManager.inbound.resume();
+            this.deltaManager.inbound.resume();
         }, (error) => {
             this.closeFn(normalizeError(error));
         });
@@ -1637,38 +1709,40 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
     public process(messageArg: ISequencedDocumentMessage, local: boolean) {
         this.verifyNotClosed();
 
-        // If it's not message for runtime, bail out right away.
-        if (!isRuntimeMessage(messageArg)) {
-            return;
-        }
-
-        // Do shallow copy of message, as methods below will modify it.
+        // Do shallow copy of message, as this.scheduleManager and this.processCore() will modify it.
         // There might be multiple container instances receiving same message
         // We do not need to make deep copy, as each layer will just replace message.content itself,
         // but would not modify contents details
-        let message = { ...messageArg };
+        const message = { ...messageArg };
 
-        // Surround the actual processing of the operation with messages to the schedule manager indicating
-        // the beginning and end. This allows it to emit appropriate events and/or pause the processing of new
-        // messages once a batch has been fully processed.
-        this.scheduleManager.beforeOpProcessing(message);
+        assert(local === (message.clientId === this.clientId), "local");
+        this.scheduleManager.process(message);
+    }
+
+    public processCore(messageArg: ISequencedDocumentMessage, beginBatch: boolean, endBatch: boolean) {
+        assert(isRuntimeMessage(messageArg), "only runtime messages should get to runtime");
+
+        if (beginBatch) {
+            this.emit("batchBegin", messageArg);
+        }
+
+        let message = unpackRuntimeMessage(messageArg);
+
+        // Chunk processing must come first given that we will transform the message to the unchunked version
+        // once all pieces are available
+        message = this.processRemoteChunkedMessage(message);
+
+        // Call the PendingStateManager to process messages.
+        const local = message.clientId === this.clientId;
+        const { localAck, localOpMetadata } = this.pendingStateManager.processMessage(message, local);
+
+        // If there are no more pending messages after processing a local message,
+        // the document is no longer dirty.
+        if (!this.pendingStateManager.hasPendingMessages()) {
+            this.updateDocumentDirtyState(false);
+        }
 
         try {
-            message = unpackRuntimeMessage(message);
-
-            // Chunk processing must come first given that we will transform the message to the unchunked version
-            // once all pieces are available
-            message = this.processRemoteChunkedMessage(message);
-
-            // Call the PendingStateManager to process messages.
-            const { localAck, localOpMetadata } = this.pendingStateManager.processMessage(message, local);
-
-            // If there are no more pending messages after processing a local message,
-            // the document is no longer dirty.
-            if (!this.pendingStateManager.hasPendingMessages()) {
-                this.updateDocumentDirtyState(false);
-            }
-
             switch (message.type) {
                 case ContainerMessageType.Attach:
                     this.dataStores.processAttachMessage(message, local || localAck);
@@ -1688,17 +1762,18 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
             }
 
             this.emit("op", message);
-            this.scheduleManager.afterOpProcessing(undefined, message);
-
+            if (endBatch) {
+                this.emit("batchEnd", undefined, message);
+            }
             if (local) {
                 // If we have processed a local op, this means that the container is
                 // making progress and we can reset the counter for how many times
                 // we have consecutively replayed the pending states
                 this.resetReconnectCount();
             }
-        } catch (e) {
-            this.scheduleManager.afterOpProcessing(e, message);
-            throw e;
+        } catch (error) {
+            this.emit("batchEnd", error, message);
+            throw error;
         }
     }
 
@@ -2188,6 +2263,10 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
         try {
             await this.deltaManager.inbound.pause();
 
+            // Ideally this layer should not deal or know about difference between
+            // summaryRefSeqNum & realSummaryRefSeqNum. The better approach here - a storage adapter
+            // sets real reference Sequence number
+            const realSummaryRefSeqNum = this.context.deltaManager.lastSequenceNumber;
             const summaryRefSeqNum = this.deltaManager.lastSequenceNumber;
             const minimumSequenceNumber = this.deltaManager.minimumSequenceNumber;
             const message = `Summary @${summaryRefSeqNum}:${this.deltaManager.minimumSequenceNumber}`;
@@ -2222,11 +2301,11 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                 // Ensure that lastSequenceNumber has not changed after pausing.
                 // We need the summary op's reference sequence number to match our summary sequence number,
                 // otherwise we'll get the wrong sequence number stamped on the summary's .protocol attributes.
-                if (this.deltaManager.lastSequenceNumber !== summaryRefSeqNum) {
+                if (this.context.deltaManager.lastSequenceNumber !== realSummaryRefSeqNum) {
                     return {
                         continue: false,
                         // eslint-disable-next-line max-len
-                        error: `lastSequenceNumber changed before uploading to storage. ${this.deltaManager.lastSequenceNumber} !== ${summaryRefSeqNum}`,
+                        error: `lastSequenceNumber changed before uploading to storage. ${this.context.deltaManager.lastSequenceNumber} !== ${realSummaryRefSeqNum}`,
                     };
                 }
                 return { continue: true };
@@ -2316,12 +2395,12 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
                 ? {
                     proposalHandle: undefined,
                     ackHandle: this.context.getLoadedFromVersion()?.id,
-                    referenceSequenceNumber: summaryRefSeqNum,
+                    referenceSequenceNumber: realSummaryRefSeqNum,
                 }
                 : {
                     proposalHandle: lastAck.summaryOp.contents.handle,
                     ackHandle: lastAck.summaryAck.contents.handle,
-                    referenceSequenceNumber: summaryRefSeqNum,
+                    referenceSequenceNumber: realSummaryRefSeqNum,
                 };
 
             let handle: string;
@@ -2468,7 +2547,7 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents>
 
         if (this.canSendOps()) {
             const serializedContent = JSON.stringify(content);
-            const maxOpSize = this.context.deltaManager.maxMessageSize;
+            const maxOpSize = this.deltaManager.maxMessageSize;
 
             // If in TurnBased flush mode we will trigger a flush at the next turn break
             if (this.flushMode === FlushMode.TurnBased && !this.needsFlush) {
@@ -2817,3 +2896,5 @@ const waitForSeq = async (
     };
     deltaManager.on("op", handleOp);
 });
+
+/* eslint-enable max-lines */
