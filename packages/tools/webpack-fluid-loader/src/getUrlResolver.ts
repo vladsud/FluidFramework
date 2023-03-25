@@ -41,6 +41,7 @@ export function getUrlResolver(
 				options.bearerSecret ?? "",
 			);
 
+		case "frs":
 		case "r11s":
 			assert(options.tenantId !== undefined, 0x320 /* options.tenantId is undefined */);
 			assert(

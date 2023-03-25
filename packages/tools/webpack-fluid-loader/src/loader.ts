@@ -72,6 +72,16 @@ export interface IRouterliciousRouteOptions extends IBaseRouteOptions {
 	enableWholeSummaryUpload?: boolean;
 }
 
+export interface IFrsRouteOptions extends IBaseRouteOptions {
+	mode: "frs";
+	discoveryEndpoint?: string;
+	fluidHost?: string;
+	tenantId?: string;
+	tenantSecret?: string;
+	bearerSecret?: string;
+	enableWholeSummaryUpload?: boolean;
+}
+
 export interface ITinyliciousRouteOptions extends IBaseRouteOptions {
 	mode: "tinylicious";
 	bearerSecret?: string;
@@ -92,7 +102,8 @@ export type RouteOptions =
 	| IDockerRouteOptions
 	| IRouterliciousRouteOptions
 	| ITinyliciousRouteOptions
-	| IOdspRouteOptions;
+	| IOdspRouteOptions
+	| IFrsRouteOptions;
 
 const isModuleWithDetails = (
 	fluidModule: IFluidModule | IFluidModuleWithDetails,

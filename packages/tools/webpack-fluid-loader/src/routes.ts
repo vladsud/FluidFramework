@@ -100,7 +100,7 @@ export const after = (
 		}
 	}
 
-	if (options.mode === "docker" || options.mode === "r11s" || options.mode === "tinylicious") {
+	if (options.mode === "docker" || options.mode === "r11s" || options.mode === "frs" || options.mode === "tinylicious") {
 		options.bearerSecret = options.bearerSecret ?? config.get("fluid:webpack:bearerSecret");
 		if (options.mode !== "tinylicious") {
 			options.tenantId = options.tenantId ?? config.get("fluid:webpack:tenantId") ?? "fluid";
@@ -117,7 +117,7 @@ export const after = (
 					  config.get("fluid:webpack:docker:tenantSecret") ??
 					  "create-new-tenants-if-going-to-production"
 					: options.tenantSecret ?? config.get("fluid:webpack:tenantSecret");
-			if (options.mode === "r11s") {
+			if (options.mode === "r11s" || options.mode === "frs") {
 				options.discoveryEndpoint =
 					options.discoveryEndpoint ?? config.get("fluid:webpack:discoveryEndpoint");
 				options.fluidHost = options.fluidHost ?? config.get("fluid:webpack:fluidHost");

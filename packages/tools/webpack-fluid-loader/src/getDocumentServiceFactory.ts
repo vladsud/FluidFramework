@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/common-utils";
+import { assert, unreachableCase } from "@fluidframework/common-utils";
 import { IDocumentServiceFactory } from "@fluidframework/driver-definitions";
 import {
 	LocalDocumentServiceFactory,
@@ -50,16 +50,18 @@ export function getDocumentServiceFactory(
 		);
 	}
 
-	switch (options.mode) {
+	const mode = options.mode;
+	switch (mode) {
 		case "docker":
 		case "r11s":
 		case "tinylicious":
-			return new RouterliciousDocumentServiceFactory(routerliciousTokenProvider, {
+		case "frs":
+				return new RouterliciousDocumentServiceFactory(routerliciousTokenProvider, {
 				enableWholeSummaryUpload:
-					options.mode === "r11s" || options.mode === "docker"
+					options.mode !== "tinylicious"
 						? options.enableWholeSummaryUpload
 						: undefined,
-				enableDiscovery: options.mode === "r11s" && options.discoveryEndpoint !== undefined,
+				enableDiscovery: (options.mode === "r11s" || options.mode === "frs") && options.discoveryEndpoint !== undefined,
 			});
 
 		case "spo":
@@ -72,7 +74,9 @@ export function getDocumentServiceFactory(
 				odspHostStoragePolicy,
 			);
 
-		default: // Local
+		case "local":		
 			return new LocalDocumentServiceFactory(deltaConnectionServer);
+		default:
+			unreachableCase(mode, `Invalid mode: ${mode}`);
 	}
 }
