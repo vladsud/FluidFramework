@@ -55,6 +55,7 @@ import {
 	LoggingError,
 	MonitoringContext,
 	tagCodeArtifacts,
+	createChildLogger,
 } from "@fluidframework/telemetry-utils";
 import { AttachState } from "@fluidframework/container-definitions";
 import { buildSnapshotTree } from "@fluidframework/driver-utils";
@@ -70,7 +71,7 @@ import {
 } from "./dataStoreContext";
 import { StorageServiceWithAttachBlobs } from "./storageServiceWithAttachBlobs";
 import { GCNodeType, detectOutboundRoutesViaDDSKey, trimLeadingAndTrailingSlashes } from "./gc";
-import { IDataStoreAliasMessage, isDataStoreAliasMessage } from "./dataStore";
+import { IDataStoreAliasMessage, channelToDataStore, isDataStoreAliasMessage } from "./dataStore";
 import { IContainerRuntimeMetadata, nonDataStorePaths, rootHasIsolatedChannels } from "./summary";
 import { ContainerMessageType, LocalContainerRuntimeMessage } from "./messageTypes";
 import { FluidDataStoreRegistry } from "./dataStoreRegistry.js";
@@ -602,6 +603,13 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 			}),
 			makeLocallyVisibleFn: () => this.makeDataStoreLocallyVisible(id),
 			snapshotTree: undefined,
+			channelToDataStoreFn: (channel: IFluidDataStoreChannel, channelId: string) =>
+				channelToDataStore(
+					channel,
+					channelId,
+					this,
+					createChildLogger({ logger: this.parentContext.logger }),
+				),
 		});
 		this.contexts.addUnbound(context);
 		return context;

@@ -546,5 +546,5 @@ export interface IFluidDataStoreContextDetached extends IFluidDataStoreContext {
 	attachRuntime(
 		factory: IProvideFluidDataStoreFactory,
 		dataStoreRuntime: IFluidDataStoreChannel,
-	): Promise<void>;
+	): Promise<IDataStore>;
 }

@@ -31,6 +31,7 @@ import {
 	CreateChildSummarizerNodeFn,
 	CreateSummarizerNodeSource,
 	channelsTreeName,
+	IFluidDataStoreChannel,
 } from "@fluidframework/runtime-definitions";
 import { GCDataBuilder, convertSummaryTreeToITree } from "@fluidframework/runtime-utils";
 import {
@@ -61,6 +62,8 @@ import {
 	WriteFluidDataStoreAttributes,
 	summarizerClientType,
 } from "../summary";
+import { channelToDataStore } from "../dataStore";
+import { ChannelCollection } from "../channelCollection";
 
 describe("Data Store Context Tests", () => {
 	const dataStoreId = "Test1";
@@ -1023,7 +1026,10 @@ describe("Data Store Context Tests", () => {
 		let scope: FluidObject;
 		let factory: IFluidDataStoreFactory;
 		const makeLocallyVisibleFn = () => {};
+		const channelToDataStoreFn = (fluidDataStore: IFluidDataStoreChannel, id: string) =>
+			channelToDataStore(fluidDataStore, id, dataStores, containerRuntime.logger);
 		let containerRuntime: ContainerRuntime;
+		let dataStores: ChannelCollection;
 		let provideDsRuntimeWithFailingEntrypoint = false;
 
 		beforeEach(async () => {
@@ -1079,6 +1085,9 @@ describe("Data Store Context Tests", () => {
 				logger: createChildLogger(),
 				clientDetails: {},
 			} as ContainerRuntime;
+
+			// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+			dataStores = {} as ChannelCollection;
 		});
 
 		describe("Initialization", () => {
@@ -1094,6 +1103,7 @@ describe("Data Store Context Tests", () => {
 						createSummarizerNodeFn,
 						makeLocallyVisibleFn,
 						snapshotTree: undefined,
+						channelToDataStoreFn,
 					});
 
 				assert.throws(codeBlock, (e: Error) =>
@@ -1116,6 +1126,7 @@ describe("Data Store Context Tests", () => {
 						createSummarizerNodeFn,
 						makeLocallyVisibleFn,
 						snapshotTree: undefined,
+						channelToDataStoreFn,
 					});
 
 					const dataStore = await factory.instantiateDataStore(
@@ -1151,6 +1162,7 @@ describe("Data Store Context Tests", () => {
 						createSummarizerNodeFn,
 						makeLocallyVisibleFn,
 						snapshotTree: undefined,
+						channelToDataStoreFn,
 					});
 
 					const dataStore = await factory.instantiateDataStore(

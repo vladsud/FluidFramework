@@ -48,6 +48,7 @@ import {
 	IIdCompressor,
 	ISummaryTreeWithStats,
 	gcDataBlobKey,
+	IDataStore,
 } from "@fluidframework/runtime-definitions";
 import { addBlobToSummary } from "@fluidframework/runtime-utils";
 import {
@@ -114,6 +115,11 @@ export interface ILocalFluidDataStoreContextProps extends IFluidDataStoreContext
 	 * @deprecated 0.16 Issue #1635, #3631
 	 */
 	readonly createProps?: any;
+}
+
+/** Properties necessary for creating a local FluidDataStoreContext */
+export interface ILocalDetachedFluidDataStoreContextProps extends ILocalFluidDataStoreContextProps {
+	readonly channelToDataStoreFn: (channel: IFluidDataStoreChannel, id: string) => IDataStore;
 }
 
 /** Properties necessary for creating a remote FluidDataStoreContext */
@@ -1216,15 +1222,20 @@ export class LocalDetachedFluidDataStoreContext
 	extends LocalFluidDataStoreContextBase
 	implements IFluidDataStoreContextDetached
 {
-	constructor(props: ILocalFluidDataStoreContextProps) {
+	constructor(props: ILocalDetachedFluidDataStoreContextProps) {
 		super(props);
 		this.detachedRuntimeCreation = true;
+		this.channelToDataStoreFn = props.channelToDataStoreFn;
 	}
+	private readonly channelToDataStoreFn: (
+		channel: IFluidDataStoreChannel,
+		id: string,
+	) => IDataStore;
 
 	public async attachRuntime(
 		registry: IProvideFluidDataStoreFactory,
 		dataStoreChannel: IFluidDataStoreChannel,
-	) {
+	): Promise<IDataStore> {
 		assert(this.detachedRuntimeCreation, 0x154 /* "runtime creation is already attached" */);
 		this.detachedRuntimeCreation = false;
 
@@ -1260,6 +1271,8 @@ export class LocalDetachedFluidDataStoreContext
 		if (await this.isRoot()) {
 			dataStoreChannel.makeVisibleAndAttachGraph();
 		}
+
+		return this.channelToDataStoreFn(dataStoreChannel, this.id);
 	}
 
 	public async getInitialSnapshotDetails(): Promise<ISnapshotDetails> {
