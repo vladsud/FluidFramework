@@ -157,6 +157,11 @@ describe("Matrix fuzz tests", () => {
 		generatorFactory: () => takeAsync(100, makeGenerator()),
 		reducer: async (state, operation) => reducer(state, operation),
 		validateConsistency: assertMatricesAreEquivalent,
+		minimizationTransforms: ["count", "start", "row", "col"].map((p) => (op) => {
+			if (p in op && typeof op[p] === "number" && op[p] > 0) {
+				op[p]--;
+			}
+		}),
 	};
 
 	const baseOptions: Partial<DDSFuzzSuiteOptions> = {

@@ -65,7 +65,7 @@ export type MatrixItem<T> = Serializable<Exclude<T, null>> | undefined;
 export class SharedMatrix<T = any> extends SharedObject<ISharedMatrixEvents<T> & ISharedObjectEvents> implements ISharedMatrix<T> {
     constructor(runtime: IFluidDataStoreRuntime, id: string, attributes: IChannelAttributes, _isSetCellConflictResolutionPolicyFWW?: boolean);
     // (undocumented)
-    protected applyStashedOp(content: any): unknown;
+    protected applyStashedOp(content: unknown): void;
     // (undocumented)
     closeMatrix(consumer: IMatrixConsumer<MatrixItem<T>>): void;
     // (undocumented)
@@ -105,7 +105,7 @@ export class SharedMatrix<T = any> extends SharedObject<ISharedMatrixEvents<T> &
     // (undocumented)
     removeRows(rowStart: number, count: number): void;
     // (undocumented)
-    protected reSubmitCore(content: any, localOpMetadata: unknown): void;
+    protected reSubmitCore(incoming: unknown, localOpMetadata: unknown): void;
     // (undocumented)
     get rowCount(): number;
     // (undocumented)
