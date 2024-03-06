@@ -34,10 +34,10 @@ export { FluidDataStoreRegistry } from "./dataStoreRegistry";
 export {
 	detectOutboundReferences,
 	RuntimeHeaders,
-	DataStoresFactory,
+	ChannelCollectionFactory,
 	AllowTombstoneRequestHeaderKey,
 	AllowInactiveRequestHeaderKey,
-} from "./dataStores";
+} from "./channelCollection";
 export {
 	GCNodeType,
 	IGCMetadata,

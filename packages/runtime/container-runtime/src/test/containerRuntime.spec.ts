@@ -40,6 +40,7 @@ import {
 	IConfigProviderBase,
 } from "@fluidframework/core-interfaces";
 import { IDocumentStorageService, ISummaryContext } from "@fluidframework/driver-definitions";
+import { ChannelCollection } from "../channelCollection.js";
 import {
 	CompressionAlgorithms,
 	ContainerRuntime,
@@ -53,7 +54,6 @@ import {
 	type UnknownContainerRuntimeMessage,
 } from "../messageTypes";
 import { PendingStateManager } from "../pendingStateManager";
-import { DataStores } from "../dataStores";
 import { ISummaryCancellationToken, neverCancelledSummaryToken } from "../summary";
 
 function submitDataStoreOp(
@@ -186,7 +186,7 @@ describe("Runtime", () => {
 				});
 
 				// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-				(containerRuntime as any).dataStores = {
+				(containerRuntime as any).channelCollection = {
 					setConnectionState: (_connected: boolean, _clientId?: string) => {},
 					// Pass data store op right back to ContainerRuntime
 					reSubmit: (type: string, envelope: any, localOpMetadata: unknown) => {
@@ -197,7 +197,7 @@ describe("Runtime", () => {
 							localOpMetadata,
 						);
 					},
-				} as DataStores;
+				} as ChannelCollection;
 
 				containerRuntime.setConnectionState(false);
 
@@ -430,7 +430,7 @@ describe("Runtime", () => {
 
 					it("Resubmitting batch preserves original batches", async () => {
 						// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-						(containerRuntime as any).dataStores = {
+						(containerRuntime as any).channelCollection = {
 							setConnectionState: (_connected: boolean, _clientId?: string) => {},
 							// Pass data store op right back to ContainerRuntime
 							reSubmit: (type: string, envelope: any, localOpMetadata: unknown) => {
@@ -441,7 +441,7 @@ describe("Runtime", () => {
 									localOpMetadata,
 								);
 							},
-						} as DataStores;
+						} as ChannelCollection;
 
 						containerRuntime.setConnectionState(false);
 
@@ -841,12 +841,12 @@ describe("Runtime", () => {
 					) => pendingMessages++,
 				} as unknown as PendingStateManager;
 			};
-			const getMockDataStores = (): DataStores => {
+			const getMockChannelCollection = (): ChannelCollection => {
 				// eslint-disable-next-line @typescript-eslint/consistent-type-assertions
 				return {
 					process: (..._args) => {},
 					setConnectionState: (..._args) => {},
-				} as DataStores;
+				} as ChannelCollection;
 			};
 
 			const getFirstContainerError = (): ICriticalContainerError => {
@@ -878,7 +878,7 @@ describe("Runtime", () => {
 			) {
 				const runtime = containerRuntime as any;
 				runtime.pendingStateManager = pendingStateManager;
-				runtime.dataStores = getMockDataStores();
+				runtime.channelCollection = getMockChannelCollection();
 				runtime.maxConsecutiveReconnects =
 					_maxReconnects ?? runtime.maxConsecutiveReconnects;
 				return runtime as ContainerRuntime;
@@ -1142,19 +1142,19 @@ describe("Runtime", () => {
 				);
 			});
 
-			/** Overwrites dataStores property and exposes private submit function with modified typing */
+			/** Overwrites channelCollection property and exposes private submit function with modified typing */
 			function patchContainerRuntime(): Omit<ContainerRuntime, "submit"> & {
 				submit: (containerRuntimeMessage: UnknownContainerRuntimeMessage) => void;
 			} {
 				const patched = containerRuntime as unknown as Omit<
 					ContainerRuntime,
-					"submit" | "dataStores"
+					"submit" | "channelCollection"
 				> & {
 					submit: (containerRuntimeMessage: UnknownContainerRuntimeMessage) => void;
-					dataStores: Partial<DataStores>;
+					channelCollection: Partial<ChannelCollection>;
 				};
 
-				patched.dataStores = {
+				patched.channelCollection = {
 					setConnectionState: (_connected: boolean, _clientId?: string) => {},
 					// Pass data store op right back to ContainerRuntime
 					reSubmit: (type: string, envelope: any, localOpMetadata: unknown) => {
@@ -1165,7 +1165,7 @@ describe("Runtime", () => {
 							localOpMetadata,
 						);
 					},
-				} satisfies Partial<DataStores>;
+				} satisfies Partial<ChannelCollection>;
 
 				return patched;
 			}

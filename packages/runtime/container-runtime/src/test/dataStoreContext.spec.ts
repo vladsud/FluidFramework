@@ -45,6 +45,7 @@ import {
 } from "@fluidframework/test-runtime-utils";
 import { DataStoreMessageType, FluidObjectHandle } from "@fluidframework/datastore";
 
+import { wrapContextForInnerChannel } from "../channelCollection.js";
 import {
 	LocalDetachedFluidDataStoreContext,
 	LocalFluidDataStoreContext,
@@ -60,7 +61,6 @@ import {
 	WriteFluidDataStoreAttributes,
 	summarizerClientType,
 } from "../summary";
-import { wrapContextForInnerChannel } from "../dataStores";
 
 describe("Data Store Context Tests", () => {
 	const dataStoreId = "Test1";
