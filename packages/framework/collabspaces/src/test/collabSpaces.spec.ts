@@ -1127,7 +1127,7 @@ describe("Temporal Collab Spaces", () => {
 		}).timeout(120000);
 
 		// TBD(Pri0): This test does not pass
-		it.skip("Structure stress test Fail #1", async () => {
+		it("Structure stress test Fail #1", async () => {
 			await stressTest(31, 20, 7, [
 				[30, overwriteCellFn],
 				[10, noopFn2],
@@ -1141,7 +1141,7 @@ describe("Temporal Collab Spaces", () => {
 		}).timeout(10000);
 
 		// TBD(Pri0): This test does not pass
-		it.skip("Structure stress test Fail #2", async () => {
+		it("Structure stress test Fail #2", async () => {
 			const { collabSpace } = await createContainer();
 
 			collabSpace.insertRows(0, 47);
@@ -1166,7 +1166,7 @@ describe("Temporal Collab Spaces", () => {
 		});
 
 		// TBD(Pri0): This test does not pass
-		it.skip("Structure stress test Fail #3", async () => {
+		it("Structure stress test Fail #3", async () => {
 			const { collabSpace } = await createContainer();
 
 			collabSpace.insertRows(0, 20);
@@ -1193,7 +1193,7 @@ describe("Temporal Collab Spaces", () => {
 		});
 
 		// TBD(Pri0): This test does not pass
-		it.skip("Structure stress test Fail #4", async () => {
+		it("Structure stress test Fail #4", async () => {
 			try {
 				await stressTest(14, 20, 7, [
 					[20, collabFn],
