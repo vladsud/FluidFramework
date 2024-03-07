@@ -19,11 +19,10 @@ import {
 	ISequencedDocumentMessage,
 } from "@fluidframework/protocol-definitions";
 import {
-	FlushMode,
-	IContainerRuntimeBase,
-	IContainerRuntimeBaseEvents,
-	IFluidDataStoreContextDetached,
-	IProvideFluidDataStoreRegistry,
+	type FlushMode,
+	type IContainerRuntimeBase,
+	type IContainerRuntimeBaseEvents,
+	type IProvideFluidDataStoreRegistry,
 } from "@fluidframework/runtime-definitions";
 
 /**
@@ -77,17 +76,6 @@ export interface IContainerRuntime
 	 * Returns undefined if no data store has been assigned the given alias.
 	 */
 	getAliasedDataStoreEntryPoint(alias: string): Promise<IFluidHandle<FluidObject> | undefined>;
-
-	/**
-	 * Creates detached data store context. Data store initialization is considered complete
-	 * only after context.attachRuntime() is called.
-	 * @param pkg - package path
-	 * @param rootDataStoreId - data store ID (unique name). Must not contain slashes.
-	 */
-	createDetachedRootDataStore(
-		pkg: Readonly<string[]>,
-		rootDataStoreId: string,
-	): IFluidDataStoreContextDetached;
 
 	/**
 	 * Returns true if document is dirty, i.e. there are some pending local changes that

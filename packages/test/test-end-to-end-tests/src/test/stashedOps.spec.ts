@@ -101,7 +101,7 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 					},
 				},
 			},
-			enableRuntimeIdCompressor: true,
+			enableRuntimeIdCompressor: "on",
 		},
 		loaderProps: {
 			configProvider: configProvider({
@@ -1753,7 +1753,7 @@ describeCompat("stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
 					},
 				},
 			},
-			enableRuntimeIdCompressor: true,
+			enableRuntimeIdCompressor: "on",
 		},
 		loaderProps: {
 			configProvider: configProvider({

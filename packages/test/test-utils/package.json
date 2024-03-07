@@ -125,6 +125,24 @@
 		}
 	},
 	"typeValidation": {
-		"broken": {}
+		"broken": {
+			"RemovedVariableDeclaration_mockConfigProvider": {
+				"forwardCompat": false,
+				"backCompat": false
+			},
+			"ClassDeclaration_TestObjectProvider": {
+				"forwardCompat": false
+			},
+			"ClassDeclaration_TestObjectProviderWithVersionedLoad": {
+				"forwardCompat": false
+			},
+			"InterfaceDeclaration_ITestObjectProvider": {
+				"forwardCompat": false
+			},
+			"InterfaceDeclaration_ITestContainerConfig": {
+				"forwardCompat": false,
+				"backCompat": false
+			}
+		}
 	}
 }

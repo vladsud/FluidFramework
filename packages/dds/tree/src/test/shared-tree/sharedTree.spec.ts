@@ -11,7 +11,7 @@ import {
 } from "@fluidframework/test-runtime-utils";
 import { ITestFluidObject, waitForContainerConnection } from "@fluidframework/test-utils";
 import { IContainerExperimental } from "@fluidframework/container-loader";
-import { ISummaryTree, SummaryType } from "@fluidframework/protocol-definitions";
+import { SummaryType } from "@fluidframework/protocol-definitions";
 import {
 	cursorForJsonableTreeNode,
 	jsonableTreeFromCursor,
@@ -49,6 +49,7 @@ import {
 	validateTreeContent,
 	validateViewConsistency,
 	checkoutWithContent,
+	type ITestTreeProvider,
 } from "../utils";
 import {
 	ForestType,
@@ -359,16 +360,21 @@ describe("SharedTree", () => {
 		});
 	});
 
-	function validateSchemaStringType(
-		summaryTree: ISummaryTree,
+	async function validateSchemaStringType(
+		provider: ITestTreeProvider,
 		treeId: string,
 		summaryType: SummaryType,
-	): void {
+	) {
+		const a = (await provider.containers[0].getEntryPoint()) as ITestFluidObject;
+		const id = a.runtime.id;
+
+		const { summaryTree } = await provider.summarize();
+
 		assert(
 			summaryTree.tree[".channels"].type === SummaryType.Tree,
 			"Runtime summary tree not created for blob dds test",
 		);
-		const dataObjectTree = summaryTree.tree[".channels"].tree.default;
+		const dataObjectTree = summaryTree.tree[".channels"].tree[id];
 		assert(
 			dataObjectTree.type === SummaryType.Tree,
 			"Data store summary tree not created for blob dds test",
@@ -478,8 +484,8 @@ describe("SharedTree", () => {
 				view1.editableTree.insertAt(0, ["A"]);
 
 				await provider.ensureSynchronized();
-				const { summaryTree } = await provider.summarize();
-				validateSchemaStringType(summaryTree, provider.trees[0].id, SummaryType.Handle);
+
+				await validateSchemaStringType(provider, provider.trees[0].id, SummaryType.Handle);
 			});
 		});
 
@@ -511,19 +517,11 @@ describe("SharedTree", () => {
 				view1.editableTree.insertAt(0, ["A"]);
 
 				await provider.ensureSynchronized();
-				validateSchemaStringType(
-					(await provider.summarize()).summaryTree,
-					provider.trees[0].id,
-					SummaryType.Handle,
-				);
+				await validateSchemaStringType(provider, provider.trees[0].id, SummaryType.Handle);
 
 				tree1.view.updateSchema(intoStoredSchema(stringSequenceRootSchema));
 				await provider.ensureSynchronized();
-				validateSchemaStringType(
-					(await provider.summarize()).summaryTree,
-					provider.trees[0].id,
-					SummaryType.Blob,
-				);
+				await validateSchemaStringType(provider, provider.trees[0].id, SummaryType.Blob);
 			});
 		});
 	});

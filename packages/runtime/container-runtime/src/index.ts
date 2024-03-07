@@ -96,6 +96,7 @@ export {
 	SummaryStage,
 	IRetriableFailureResult,
 	ISummarizeEventProps,
+	IdCompressorMode,
 } from "./summary";
 export { IChunkedOp, unpackRuntimeMessage } from "./opLifecycle";
 
