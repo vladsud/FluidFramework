@@ -356,9 +356,22 @@ describe("Temporal Collab Spaces", () => {
 		}
 	};
 
+	// I've observed that we could hit an error (like infinite reconnects) that results in container being closed.
+	// But that error does not manifest in any way through the test, other than some random invariant being broken somewhere.
+	// This makes debugging these issues extreamly hard. So validate through the code that containers are not closed.
+	function validateNotClosed() {
+		for (const c of containers) {
+			if (c.closed) {
+				throw new Error("One of containers is closed");
+			}
+		}
+	}
+
 	async function doFinalValidation() {
+		validateNotClosed();
 		await moveMsnForAllContainers();
 		await synchronizeAndValidateContainerFn();
+		validateNotClosed();
 
 		for (const cp of [...collabSpaces, summarizerCollabSpace]) {
 			// summarizerCollabSpace is undefined in detached tests
@@ -392,6 +405,8 @@ describe("Temporal Collab Spaces", () => {
 				assert(cp.destroyCellChannel(channel), "should be able to destroy rooted channel");
 			}
 		}
+
+		validateNotClosed();
 	}
 
 	async function saveAndDestroyChannel(
@@ -1126,7 +1141,6 @@ describe("Temporal Collab Spaces", () => {
 			]);
 		}).timeout(120000);
 
-		// TBD(Pri0): This test does not pass
 		it("Structure stress test Fail #1", async () => {
 			await stressTest(31, 20, 7, [
 				[30, overwriteCellFn],
@@ -1140,7 +1154,6 @@ describe("Temporal Collab Spaces", () => {
 			]);
 		}).timeout(10000);
 
-		// TBD(Pri0): This test does not pass
 		it("Structure stress test Fail #2", async () => {
 			const { collabSpace } = await createContainer();
 
@@ -1165,7 +1178,6 @@ describe("Temporal Collab Spaces", () => {
 			assert(value?.value === undefined, "wrong value!");
 		});
 
-		// TBD(Pri0): This test does not pass
 		it("Structure stress test Fail #3", async () => {
 			const { collabSpace } = await createContainer();
 
@@ -1192,27 +1204,18 @@ describe("Temporal Collab Spaces", () => {
 			await collabSpaces[0].getAllChannels();
 		});
 
-		// TBD(Pri0): This test does not pass
 		it("Structure stress test Fail #4", async () => {
-			try {
-				await stressTest(14, 20, 7, [
-					[20, collabFn],
-					[10, overwriteCellFn],
-					[10, overwriteCellUndefinedFn],
-					[20, insertColsFn],
-					[20, insertRowsFn],
-					[10, removeColsFn],
-					[10, removeRowsFn],
-					[10, saveChannelFn],
-					[5, addContainerInstanceFn],
-				]);
-			} catch (e) {
-				console.log("Structure in stress test", e);
-				for (const item of commandArray) {
-					console.log(item);
-				}
-				throw e;
-			}
+			await stressTest(14, 20, 7, [
+				[20, collabFn],
+				[10, overwriteCellFn],
+				[10, overwriteCellUndefinedFn],
+				[20, insertColsFn],
+				[20, insertRowsFn],
+				[10, removeColsFn],
+				[10, removeRowsFn],
+				[10, saveChannelFn],
+				[5, addContainerInstanceFn],
+			]);
 		}).timeout(240000);
 
 		it("General Stress test", async () => {
