@@ -1791,7 +1791,12 @@ export class ContainerRuntime
 		return this.summarizerNode.deleteChild(id);
 	}
 
+	/* IFluidParentContext APIs that should not be called on Root */
 	public makeLocallyVisible() {
+		assert(false, "should not be called");
+	}
+
+	public setChannelDirty(address: string) {
 		assert(false, "should not be called");
 	}
 
