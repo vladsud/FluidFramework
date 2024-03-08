@@ -68,6 +68,7 @@ import {
 	LocalFluidDataStoreContext,
 	createAttributesBlob,
 	LocalDetachedFluidDataStoreContext,
+	IFluidDataStoreContextInternal,
 } from "./dataStoreContext.js";
 import { StorageServiceWithAttachBlobs } from "./storageServiceWithAttachBlobs.js";
 import {
@@ -477,47 +478,43 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 		}
 
 		const resolve = localOpMetadata as PendingAliasResolve;
-		const aliasResult = this.processAliasMessageCore(aliasMessage);
+		const aliasResult = this.processAliasMessageCore(
+			aliasMessage.internalId,
+			aliasMessage.alias,
+		);
 		if (local) {
 			resolve(aliasResult);
 		}
 	}
 
-	public processAliasMessageCore(aliasMessage: IDataStoreAliasMessage): boolean {
-		if (this.alreadyProcessed(aliasMessage.alias)) {
+	public processAliasMessageCore(internalId: string, alias: string): boolean {
+		if (this.alreadyProcessed(alias)) {
 			return false;
 		}
 
-		const context = this.contexts.get(aliasMessage.internalId);
+		const context = this.contexts.get(internalId);
 		// If the data store has been deleted, log an error and ignore this message. This helps prevent document
 		// corruption in case a deleted data store accidentally submitted a signal.
-		if (
-			this.checkAndLogIfDeleted(
-				aliasMessage.internalId,
-				context,
-				"Changed",
-				"processAliasMessageCore",
-			)
-		) {
+		if (this.checkAndLogIfDeleted(internalId, context, "Changed", "processAliasMessageCore")) {
 			return false;
 		}
 
 		if (context === undefined) {
 			this.mc.logger.sendErrorEvent({
 				eventName: "AliasFluidDataStoreNotFound",
-				fluidDataStoreId: aliasMessage.internalId,
+				fluidDataStoreId: internalId,
 			});
 			return false;
 		}
 
 		const handle = new FluidObjectHandle(
 			context,
-			aliasMessage.internalId,
+			internalId,
 			this.parentContext.IFluidHandleContext,
 		);
 		this.parentContext.addedGCOutboundReference?.(this.containerRuntimeHandle, handle);
 
-		this.aliasMap.set(aliasMessage.alias, context.id);
+		this.aliasMap.set(alias, context.id);
 		context.setInMemoryRoot();
 		return true;
 	}
@@ -527,7 +524,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 	}
 
 	/** Package up the context's attach summary etc into an IAttachMessage */
-	private generateAttachMessage(localContext: LocalFluidDataStoreContext): IAttachMessage {
+	private generateAttachMessage(localContext: IFluidDataStoreContextInternal): IAttachMessage {
 		const { attachSummary } = localContext.getAttachData(/* includeGCData: */ true);
 		const type = localContext.packagePath[localContext.packagePath.length - 1];
 
@@ -605,7 +602,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 		id: string,
 		props?: any,
 		loadingGroupId?: string,
-	) {
+	): IFluidDataStoreContextInternal {
 		assert(!id.includes("/"), 0x30d /* Id cannot contain slashes */);
 		const context = new LocalFluidDataStoreContext({
 			id,
@@ -788,7 +785,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 	public async getDataStore(
 		id: string,
 		requestHeaderData: RuntimeHeaderData,
-	): Promise<FluidDataStoreContext> {
+	): Promise<IFluidDataStoreContextInternal> {
 		const headerData = { ...defaultRuntimeHeaderData, ...requestHeaderData };
 		if (
 			this.checkAndLogIfDeleted(
@@ -822,7 +819,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 	public async getDataStoreIfAvailable(
 		id: string,
 		requestHeaderData: RuntimeHeaderData,
-	): Promise<FluidDataStoreContext | undefined> {
+	): Promise<IFluidDataStoreContextInternal | undefined> {
 		// If the data store has been deleted, log an error and return undefined.
 		if (
 			this.checkAndLogIfDeleted(
@@ -853,7 +850,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 	 */
 	private checkAndLogIfDeleted(
 		id: string,
-		context: FluidDataStoreContext | undefined,
+		context: IFluidDataStoreContext | undefined,
 		deletedLogSuffix: string,
 		callSite: string,
 		requestHeaderData?: RuntimeHeaderData,
