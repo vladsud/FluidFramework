@@ -70,7 +70,7 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>> extends Type
     // @internal (undocumented)
     protected readonly contexts: Map<string, IChannelContext>;
     // (undocumented)
-    createChannel(id: string | undefined, type: string): IChannel;
+    createChannel(idArg: string | undefined, type: string): IChannel;
     // (undocumented)
     protected createChannelCore(channel: IChannel): void;
     // (undocumented)
@@ -142,6 +142,7 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>> extends Type
     updateUsedRoutes(usedRoutes: string[]): void;
     // (undocumented)
     uploadBlob(blob: ArrayBufferLike, signal?: AbortSignal): Promise<IFluidHandle<ArrayBufferLike>>;
+    protected validateChannelId(id: string): void;
     // (undocumented)
     protected verifyNotClosed(): void;
     // (undocumented)

@@ -473,9 +473,11 @@ export class SharedMatrix<T = any>
 		if (colStart > this.colCount) {
 			throw new UsageError("insertCols: out of bounds");
 		}
-		this.protectAgainstReentrancy(() =>
-			this.submitColMessage(this.cols.insert(colStart, count)),
-		);
+		this.protectAgainstReentrancy(() => {
+			const message = this.cols.insert(colStart, count);
+			assert(message !== undefined, "must be defined");
+			this.submitColMessage(message);
+		});
 	}
 
 	public removeCols(colStart: number, count: number) {
@@ -501,9 +503,11 @@ export class SharedMatrix<T = any>
 		if (rowStart > this.rowCount) {
 			throw new UsageError("insertRows: out of bounds");
 		}
-		this.protectAgainstReentrancy(() =>
-			this.submitRowMessage(this.rows.insert(rowStart, count)),
-		);
+		this.protectAgainstReentrancy(() => {
+			const message = this.rows.insert(rowStart, count);
+			assert(message !== undefined, "must be defined");
+			this.submitRowMessage(message);
+		});
 	}
 
 	public removeRows(rowStart: number, count: number) {

@@ -61,6 +61,7 @@ import {
 	unpackChildNodesUsedRoutes,
 	addBlobToSummary,
 	processAttachMessageGCData,
+	encodeCompactIdToString,
 } from "@fluidframework/runtime-utils";
 import {
 	IChannel,
@@ -413,15 +414,26 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>>
 		this.verifyNotClosed();
 
 		const id = channel.id;
-		if (id.includes("/")) {
-			throw new UsageError(`Id cannot contain slashes: ${id}`);
-		}
-
 		assert(!this.contexts.has(id), 0x179 /* "createChannel() with existing ID" */);
 
 		this.createChannelContext(channel);
 		// Channels (DDS) should not be created in summarizer client.
 		this.identifyLocalChangeInSummarizer("DDSCreatedInSummarizer", id, channel.attributes.type);
+	}
+
+	/**
+	 * Validate user provided channel ID
+	 * Channel ID has limitations. "/" is not allowed as IDs in storage can not have slashes - we parse tree paths and use "/" as separator.
+	 * IDs cannot start with "_" as it could result in collision of IDs with auto-assigned (by FF) short IDs.
+	 * @param id - channel ID.
+	 */
+	protected validateChannelId(id: string) {
+		if (id.includes("/")) {
+			throw new UsageError(`Id cannot contain slashes: ${id}`);
+		}
+		if (id.startsWith("_")) {
+			throw new UsageError(`Id cannot start with underscore: ${id}`);
+		}
 	}
 
 	/**
@@ -432,6 +444,11 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>>
 	 * @param channel - channel which needs to be added to the runtime.
 	 */
 	public addChannel(channel: IChannel): void {
+		const id = channel.id;
+		this.validateChannelId(id);
+
+		this.verifyNotClosed();
+
 		const type = channel.attributes.type;
 		const factory = this.sharedObjectRegistry.get(type);
 		if (factory === undefined) {
@@ -441,7 +458,34 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>>
 		this.createChannelCore(channel);
 	}
 
-	public createChannel(id: string = uuid(), type: string): IChannel {
+	public createChannel(idArg: string | undefined, type: string): IChannel {
+		let id: string;
+
+		if (idArg !== undefined) {
+			id = idArg;
+			this.validateChannelId(id);
+		} else {
+			// We use three non-overlapping namespaces:
+			// - detached state: even numbers
+			// - attached state: odd numbers
+			// - uuids
+			// In first two cases we will encode result as strings in more compact form, with leading underscore,
+			// to ensure no overlap with user-provided DDS names (see validateChannelId())
+			if (this.visibilityState !== VisibilityState.GloballyVisible) {
+				// container is detached, only one client observes content, no way to hit collisions with other clients.
+				id = encodeCompactIdToString(2 * this.contexts.size, "_");
+			} else {
+				// Due to back-compat, we could not depend yet on generateDocumentUniqueId() being there.
+				// We can remove the need to leverage uuid() as fall-back in couple releases.
+				const res =
+					this.dataStoreContext.containerRuntime.generateDocumentUniqueId?.() ?? uuid();
+				id = typeof res === "number" ? encodeCompactIdToString(2 * res + 1, "_") : res;
+			}
+			assert(!id.includes("/"), "slash");
+		}
+
+		this.verifyNotClosed();
+
 		assert(type !== undefined, 0x209 /* "Factory Type should be defined" */);
 		const factory = this.sharedObjectRegistry.get(type);
 		if (factory === undefined) {
