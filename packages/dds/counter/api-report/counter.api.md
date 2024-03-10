@@ -17,7 +17,7 @@ import { ISummaryTreeWithStats } from '@fluidframework/runtime-definitions';
 import { SharedObject } from '@fluidframework/shared-object-base';
 
 // @internal @sealed
-export class CounterFactory implements IChannelFactory {
+export class CounterFactory implements IChannelFactory<ISharedCounter> {
     static readonly Attributes: IChannelAttributes;
     get attributes(): IChannelAttributes;
     create(document: IFluidDataStoreRuntime, id: string): ISharedCounter;

@@ -7,9 +7,11 @@ export {
 	MatrixExternalType,
 	IEfficientMatrix,
 	ICollabChannelFactory,
-	ICollabChannelCore,
 	ICollabChannel,
 	CollabSpaceCellType,
 	SaveResult,
+	IInternalChannel,
+	getCollabValue,
+	getCollabChannel,
 } from "./contracts";
 export { createCollabSpaces } from "./factory";

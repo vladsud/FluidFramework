@@ -5,46 +5,56 @@
 
 import { assert } from "@fluidframework/core-utils";
 import {
-	type IFluidDataStoreRuntime,
-	type IChannelFactory,
-	type IChannelServices,
-	IChannelAttributes,
-	IChannelStorageService,
-} from "@fluidframework/datastore-definitions";
-import {
-	createSingleBlobSummary,
-	type IFluidSerializer,
-	SharedObject,
-} from "@fluidframework/shared-object-base";
-import { ISummaryTreeWithStats } from "@fluidframework/runtime-definitions";
+	IFluidDataStoreContext,
+	ITelemetryContext,
+	IGarbageCollectionData,
+	IInboundSignalMessage,
+	IFluidDataStoreChannel,
+	ISummaryTreeWithStats,
+} from "@fluidframework/runtime-definitions";
+import { createSingleBlobSummary } from "@fluidframework/shared-object-base";
 import { readAndParse } from "@fluidframework/driver-utils";
-
+import { FluidObject, IFluidHandle, IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { type ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
+import { FluidObjectHandle } from "@fluidframework/datastore";
 
-import { ICollabChannel } from "./contracts";
-import { pkgVersion } from "./packageVersion";
+import { ICollabChannelFactory } from "./contracts";
 
 const snapshotFileName = "header";
 
 /**
  * Deferred Channel
  */
-export class DeferredChannel extends SharedObject implements ICollabChannel {
+export class DeferredChannel implements IFluidDataStoreChannel {
 	readonly type = DeferredChannel.Type;
 	static readonly Type = "CollabSpaceDeferredChannelType";
 
 	private ops: ISequencedDocumentMessage[] = [];
 
+	public readonly entryPoint: IFluidHandle<FluidObject>;
+	public get id() {
+		return this.dataStoreContext.id;
+	}
+
 	public getOps() {
 		return this.ops;
 	}
 
-	public constructor(
-		id: string,
-		runtime: IFluidDataStoreRuntime,
-		attributes: IChannelAttributes,
-	) {
-		super(id, runtime, attributes, "fluid_collabspace_deferred");
+	public constructor(protected readonly dataStoreContext: IFluidDataStoreContext) {
+		this.entryPoint = new FluidObjectHandle<FluidObject>(
+			{},
+			"",
+			this.dataStoreContext.IFluidHandleContext,
+		);
+	}
+
+	public async loadExisting(): Promise<void> {
+		const blobId = this.dataStoreContext.baseSnapshot?.blobs[snapshotFileName];
+		assert(blobId !== undefined, "deferred channel not serialized correctly");
+		this.ops = await readAndParse<ISequencedDocumentMessage[]>(
+			this.dataStoreContext.storage,
+			blobId,
+		);
 	}
 
 	public get value(): number {
@@ -52,79 +62,92 @@ export class DeferredChannel extends SharedObject implements ICollabChannel {
 		return 0;
 	}
 
-	public static create(runtime: IFluidDataStoreRuntime, id?: string): DeferredChannel {
-		return runtime.createChannel(id, DeferredChannel.Type) as DeferredChannel;
+	public getAttachSummary(telemetryContext?: ITelemetryContext): ISummaryTreeWithStats {
+		assert(false, "should not be called");
 	}
 
-	public static getFactory(): IChannelFactory {
-		return new DeferredChannelFactory();
+	// TBD(PRI2): Implement?
+	// getAttachGCData?(telemetryContext?: ITelemetryContext): IGarbageCollectionData;
+
+	// TBD(PRI2): Implement?
+	public async getGCData(fullGC?: boolean): Promise<IGarbageCollectionData> {
+		return { gcNodes: {} };
 	}
 
-	protected summarizeCore(serializer: IFluidSerializer): ISummaryTreeWithStats {
-		return createSingleBlobSummary(snapshotFileName, JSON.stringify(this.ops));
-	}
+	public updateUsedRoutes(usedRoutes: string[]): void {}
 
-	protected async loadCore(storage: IChannelStorageService): Promise<void> {
-		this.ops = await readAndParse<ISequencedDocumentMessage[]>(storage, snapshotFileName);
-	}
-
-	protected onDisconnect(): void {}
-
-	protected processCore(
+	public process(
 		message: ISequencedDocumentMessage,
 		local: boolean,
 		localOpMetadata: unknown,
+		addedOutboundReference?: (fromNodePath: string, toNodePath: string) => void,
 	): void {
 		this.ops.push(message);
 	}
 
-	protected applyStashedOp(op: unknown): void {
-		assert(false, "there should be no stashed ops!");
+	public async summarize(
+		fullTree?: boolean,
+		trackState?: boolean,
+		telemetryContext?: ITelemetryContext,
+	): Promise<ISummaryTreeWithStats> {
+		return createSingleBlobSummary(snapshotFileName, JSON.stringify(this.ops));
+	}
+
+	/* Noop or non-callable methods */
+
+	public processSignal(message: IInboundSignalMessage, local: boolean): void {
+		assert(false, "should not be called");
+	}
+
+	public dispose() {}
+
+	public get disposed(): boolean {
+		assert(false, "should not be called");
+		return false;
+	}
+	public makeVisibleAndAttachGraph() {
+		this.dataStoreContext.makeLocallyVisible();
+	}
+
+	public setConnectionState(connected: boolean, clientId?: string) {}
+
+	public reSubmit(type: string, content: any, localOpMetadata: unknown) {
+		assert(false, "should not be called");
+	}
+
+	public async applyStashedOp(content: any): Promise<unknown> {
+		assert(false, "should not be called");
+	}
+
+	public async request(request: IRequest): Promise<IResponse> {
+		assert(false, "should not be called");
 	}
 }
 
 /**
  * Deferred Channel Factory
  */
-export class DeferredChannelFactory implements IChannelFactory {
-	public static readonly Attributes: IChannelAttributes = {
-		type: DeferredChannel.Type,
-		snapshotFormatVersion: "0.1",
-		packageVersion: pkgVersion,
-	};
-
-	public get type(): string {
-		return DeferredChannel.Type;
+export class DeferredChannelFactory implements ICollabChannelFactory {
+	get IFluidDataStoreFactory() {
+		return this;
 	}
 
-	public get attributes(): IChannelAttributes {
-		return DeferredChannelFactory.Attributes;
+	public static readonly type = DeferredChannel.Type;
+	public readonly type = DeferredChannel.Type;
+
+	public async instantiateDataStore(
+		context: IFluidDataStoreContext,
+		existing: boolean,
+	): Promise<IFluidDataStoreChannel> {
+		const channel = new DeferredChannel(context);
+		assert(existing, "existing");
+		await channel.loadExisting();
+		return channel;
 	}
 
-	public async load(
-		runtime: IFluidDataStoreRuntime,
-		id: string,
-		services: IChannelServices,
-		attributes: IChannelAttributes,
-	): Promise<ICollabChannel> {
-		const counter = new DeferredChannel(id, runtime, attributes);
-		await counter.load(services);
-		return counter;
-	}
-
-	public create(document: IFluidDataStoreRuntime, id: string): ICollabChannel {
-		const counter = new DeferredChannel(id, document, this.attributes);
-		counter.initializeLocal();
-		return counter;
-	}
-
-	public create2(
-		runtime: IFluidDataStoreRuntime,
-		id: string,
-		initialValue: unknown,
-	): ICollabChannel {
+	public async create2(context: IFluidDataStoreContext, initialValue: unknown) {
 		assert(initialValue === undefined, "initial value");
-		const channel = new DeferredChannel(id, runtime, this.attributes);
+		const channel = new DeferredChannel(context);
 		return channel;
 	}
 }

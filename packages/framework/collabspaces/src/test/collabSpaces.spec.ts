@@ -4,6 +4,7 @@
  */
 
 import { assert, delay } from "@fluidframework/core-utils";
+import { type FluidObject } from "@fluidframework/core-interfaces";
 import {
 	ITestObjectProvider,
 	TestContainerRuntimeFactory,
@@ -12,50 +13,109 @@ import {
 	summarizeNow,
 	createSummarizerCore,
 } from "@fluidframework/test-utils";
-import { ContainerRuntimeFactoryWithDefaultDataStore } from "@fluidframework/aqueduct";
-import { IContainer, IHostLoader } from "@fluidframework/container-definitions";
+import { BaseContainerRuntimeFactory } from "@fluidframework/aqueduct";
+import { AttachState, IContainer, IHostLoader } from "@fluidframework/container-definitions";
 import {
 	IContainerRuntimeOptions,
 	ISummarizer,
 	ISummaryRuntimeOptions,
 	SummaryCollection,
 } from "@fluidframework/container-runtime";
+import { type IFluidDataStoreFactory } from "@fluidframework/runtime-definitions";
 import { LocalServerTestDriver } from "@fluid-private/test-drivers";
 import { Loader } from "@fluidframework/container-loader";
 import { createChildLogger } from "@fluidframework/telemetry-utils";
 import { IRevertible } from "@fluidframework/matrix";
+import { type IContainerRuntime } from "@fluidframework/container-runtime-definitions";
 
 import {
-	ICollabChannelCore,
 	CollabSpaceCellType,
 	IEfficientMatrix,
 	IEfficientMatrixTest,
 	SaveResult,
+	type IInternalChannel,
+	getCollabValue,
 } from "../contracts";
 import { createCollabSpaces } from "../factory";
 
-import { CounterFactory, ISharedCounter } from "./counterFactory";
+import { TestDataObject, ISharedCounter } from "./counterFactory";
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 type IMatrix = IEfficientMatrix & IEfficientMatrixTest;
 
 function sampleFactory() {
-	return createCollabSpaces([new CounterFactory()], true /* createDebugChannel */);
+	const factory = TestDataObject.factory;
+	return createCollabSpaces([[factory.type, Promise.resolve(factory)]]);
 }
 
-/*
- * // TBD(Pri2):
- * Things to test:
- * 1. Detached data store mode
- * 2. Fuzz tests
- */
+interface IEntryPoint {
+	collabSpace: IMatrix;
+	debug: TestDataObject;
+}
+
+function isSameChannel(
+	ch1: IInternalChannel<ISharedCounter>,
+	ch2: IInternalChannel<ISharedCounter>,
+) {
+	return ch1.id === ch2.id && ch1.channel === ch1.channel;
+}
+
+export class RuntimeFactory extends BaseContainerRuntimeFactory {
+	public static readonly defaultDataStoreId = "default";
+	public static readonly debugDataStoreId = "second";
+
+	protected static readonly defaultFactory: IFluidDataStoreFactory = sampleFactory();
+
+	public constructor(runtimeOptions?: IContainerRuntimeOptions) {
+		const provideEntryPoint = async (runtime: IContainerRuntime): Promise<FluidObject> => {
+			const entryPoint = await runtime.getAliasedDataStoreEntryPoint(
+				RuntimeFactory.defaultDataStoreId,
+			);
+			assert(entryPoint !== undefined, "no try point");
+
+			const entryPoint2 = await runtime.getAliasedDataStoreEntryPoint(
+				RuntimeFactory.debugDataStoreId,
+			);
+			assert(entryPoint2 !== undefined, "no try point");
+
+			return {
+				collabSpace: (await entryPoint.get()) as IMatrix,
+				debug: (await entryPoint2.get()) as TestDataObject,
+			} satisfies IEntryPoint;
+		};
+
+		super({
+			registryEntries: [
+				[
+					RuntimeFactory.defaultFactory.type,
+					Promise.resolve(RuntimeFactory.defaultFactory),
+				],
+				[TestDataObject.Type, Promise.resolve(TestDataObject.factory)],
+			],
+			requestHandlers: [],
+			provideEntryPoint,
+			runtimeOptions,
+		});
+	}
+
+	/**
+	 * {@inheritDoc BaseContainerRuntimeFactory.containerInitializingFirstTime}
+	 */
+	protected async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
+		const dataStore = await runtime.createDataStore(RuntimeFactory.defaultFactory.type);
+		await dataStore.trySetAlias(RuntimeFactory.defaultDataStoreId);
+
+		const dataStore2 = await runtime.createDataStore(TestDataObject.Type);
+		await dataStore2.trySetAlias(RuntimeFactory.debugDataStoreId);
+	}
+}
 
 describe("Temporal Collab Spaces", () => {
 	let provider: ITestObjectProvider;
 	let containers: IContainer[] = [];
 	let collabSpaces: IMatrix[] = [];
-	let summarizerCollabSpace: IMatrix;
+	let sendSomeOpCollection: (() => void)[] = [];
 	let summaryCollection: SummaryCollection | undefined;
 	let summarizer: ISummarizer | undefined;
 	let loader: IHostLoader | undefined;
@@ -73,15 +133,11 @@ describe("Temporal Collab Spaces", () => {
 		enableGroupedBatching: true,
 		chunkSizeInBytes: 950000,
 		maxBatchSizeInBytes: 990000,
-		enableRuntimeIdCompressor: true,
+		enableRuntimeIdCompressor: "on",
 		summaryOptions: summaryOptionsToDisableHeuristics, // Force summarizer heuristics to be disabled so we can control when to summarize.
 	};
-	const defaultFactory = sampleFactory();
-	const runtimeFactory = new ContainerRuntimeFactoryWithDefaultDataStore({
-		defaultFactory,
-		registryEntries: [[defaultFactory.type, Promise.resolve(defaultFactory)]],
-		runtimeOptions,
-	});
+
+	const runtimeFactory = new RuntimeFactory(runtimeOptions);
 
 	// Produce pseudo-random numbers from a seed (i.e. repeatable stream):
 	function random() {
@@ -98,10 +154,16 @@ describe("Temporal Collab Spaces", () => {
 
 	async function addContainer(container: IContainer) {
 		containers.push(container);
-		const collabSpace = (await container.getEntryPoint()) as IMatrix;
+		const entry = (await container.getEntryPoint()) as IEntryPoint;
+		const collabSpace = entry.collabSpace;
 		collabSpaces.push(collabSpace);
+		sendSomeOpCollection.push(() => {
+			entry.debug.sendSomeOp();
+		});
 
-		await provider.ensureSynchronized();
+		if (container.attachState !== AttachState.Detached) {
+			await provider.ensureSynchronized();
+		}
 		ensureSameSize();
 
 		return { container, collabSpace };
@@ -144,6 +206,7 @@ describe("Temporal Collab Spaces", () => {
 		}
 		containers = [];
 		collabSpaces = [];
+		sendSomeOpCollection = [];
 		summaryCollection = undefined;
 		summarizer = undefined;
 		loader = undefined;
@@ -238,7 +301,11 @@ describe("Temporal Collab Spaces", () => {
 		// There are likely better way to achieve it, but we need all containers to advertise their
 		// reference sequence number such that MSN moves.
 		containers.push(summarizerRes.container);
-		summarizerCollabSpace = (await container.getEntryPoint()) as IMatrix;
+
+		// Can't reach out to guts of summarizer. So at least send some noop
+		sendSomeOpCollection.push(() => {
+			(container as any).submitMessage("noop");
+		});
 
 		// Ensure that data store is properly attached. It should be, as default
 		// data store is aliased (and thus attached) in test container
@@ -252,7 +319,7 @@ describe("Temporal Collab Spaces", () => {
 		// all cells with same data.
 		await populateInitialMatrix(collabSpace, rows, cols, {
 			value: 5,
-			type: CounterFactory.Type,
+			type: TestDataObject.Type,
 		});
 
 		await provider.ensureSynchronized();
@@ -276,11 +343,11 @@ describe("Temporal Collab Spaces", () => {
 		row: number,
 		col: number,
 		value: unknown,
-		channels: ICollabChannelCore[] = [],
+		channels: IInternalChannel[] = [],
 	) {
 		// const cp1 = collabSpaces[0];
 		for (const channel of channels) {
-			assert(channel.value === value, "Channel value is not the same!");
+			assert(getCollabValue(channel) === value, "Channel value is not the same!");
 		}
 		for (const cp of collabSpaces) {
 			const value2 = await cp.getCellAsync(row, col);
@@ -301,29 +368,22 @@ describe("Temporal Collab Spaces", () => {
 		console.log(time);
 	}
 
-	function sendNoop(cp: IMatrix) {
-		cp.sendSomeDebugOp();
-	}
-
 	async function moveMsnForAllContainers() {
 		// Submit some op
-		sendNoop(collabSpaces[0]);
+		sendSomeOpCollection[0]();
 
 		// make sure all containers saw all the ops, and thus updated their reference Sequence number
 		await provider.ensureSynchronized();
 		const seq = containers[0].deltaManager.lastSequenceNumber;
 
 		// every container to communicate their reference sequence number, allow MSN to move forward
-		for (const cp of [...collabSpaces, summarizerCollabSpace]) {
-			// summarizerCollabSpace is undefined in detached tests
-			if (cp !== undefined) {
-				sendNoop(cp);
-			}
+		for (const debug of sendSomeOpCollection) {
+			debug();
 		}
 
 		await provider.ensureSynchronized();
 
-		sendNoop(collabSpaces[0]);
+		sendSomeOpCollection[0]();
 		await provider.ensureSynchronized();
 
 		// TBD(Pri2)
@@ -333,8 +393,8 @@ describe("Temporal Collab Spaces", () => {
 		// But even that is not enough, but sending more ops resolve the issue, likely due to hitting another
 		// noop heuristic. Not sure - need to figure it out!
 		while (containers[0].deltaManager.minimumSequenceNumber < seq) {
-			await delay(0);
-			sendNoop(collabSpaces[0]);
+			await delay(1);
+			sendSomeOpCollection[0]();
 		}
 		assert(containers[0].deltaManager.minimumSequenceNumber >= seq, "MSN did not move!");
 		ensureSameSize();
@@ -373,11 +433,7 @@ describe("Temporal Collab Spaces", () => {
 		await synchronizeAndValidateContainerFn();
 		validateNotClosed();
 
-		for (const cp of [...collabSpaces, summarizerCollabSpace]) {
-			// summarizerCollabSpace is undefined in detached tests
-			if (cp === undefined) {
-				continue;
-			}
+		for (const cp of collabSpaces) {
 			const { rooted, notRooted } = await cp.getAllChannels();
 			for (const channel of rooted) {
 				const res = cp.saveChannelState(channel);
@@ -394,7 +450,7 @@ describe("Temporal Collab Spaces", () => {
 			}
 
 			await provider.ensureSynchronized();
-			sendNoop(collabSpaces[0]);
+			sendSomeOpCollection[0]();
 			await synchronizeAndValidateContainerFn();
 
 			for (const channel of rooted) {
@@ -410,7 +466,7 @@ describe("Temporal Collab Spaces", () => {
 	}
 
 	async function saveAndDestroyChannel(
-		channel: ISharedCounter,
+		channel: IInternalChannel<ISharedCounter>,
 		collabSpace: IMatrix,
 		row: number,
 		col: number,
@@ -444,26 +500,29 @@ describe("Temporal Collab Spaces", () => {
 			const col = 3;
 
 			const container = await loader!.createDetachedContainer(provider.defaultCodeDetails);
-			containers.push(container);
-			const collabSpace = (await container.getEntryPoint()) as IMatrix;
-			collabSpaces.push(collabSpace);
+			const { collabSpace } = await addContainer(container);
 
 			assert(!collabSpace.isAttached, "data store is not attached");
 
 			await populateInitialMatrix(collabSpace, 20, 7, {
 				value: 5,
-				type: CounterFactory.Type,
+				type: TestDataObject.Type,
 			});
 
 			// Create a collab channel to start collaboration.
-			const channel = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-			let channel2 = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-			assert(channel === channel2, "getCellChannel() returns same channel");
-			assert(!channel.isAttached(), "channel is not properly attached");
+			const channel = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
+			let channel2 = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
+			assert(isSameChannel(channel, channel2), "getCellChannel() returns same channel");
 
 			// Collaborate a bit :)
 			let initialValue = (await collabSpace.getCellAsync(row, col))?.value as number;
-			channel.increment(100);
+			channel.value.increment(100);
 			initialValue += 100;
 
 			// Save changes and destroy channel
@@ -475,9 +534,12 @@ describe("Temporal Collab Spaces", () => {
 			assert(value2?.value === initialValue, "value was preserved correctly");
 
 			// Get channel back.
-			channel2 = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-			assert(channel2.value === initialValue, "value was preserved correctly");
-			channel2.increment(10);
+			channel2 = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
+			assert(getCollabValue(channel2) === initialValue, "value was preserved correctly");
+			channel2.value.increment(10);
 			initialValue += 10;
 
 			const request = provider.driver.createCreateNewRequest(provider.documentId);
@@ -543,7 +605,7 @@ describe("Temporal Collab Spaces", () => {
 			collabSpace.insertRows(1, numberOfNewRows);
 			collabSpace.setCell(row, col, {
 				value: 5,
-				type: CounterFactory.Type,
+				type: TestDataObject.Type,
 			});
 			const { rowId, colId } = await collabSpace.getCellDebugInfo(row, col);
 			const debugMapInfo = collabSpace.getReverseMapsDebugInfo();
@@ -721,18 +783,20 @@ describe("Temporal Collab Spaces", () => {
 		let initialValue = (await collabSpace.getCellAsync(row, col))?.value as number;
 
 		// Create a collab channel to start collaboration.
-		let channel = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-		let channel2 = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-		assert(channel === channel2, "getCellChannel() returns same channel");
-
-		// If channel is not properly attached, then the rest of the test will fail as
-		// data will not be replicated properly.
-		assert(channel.isAttached(), "channel is not properly attached");
+		let channel = (await collabSpace.getCellChannel(
+			row,
+			col,
+		)) as IInternalChannel<ISharedCounter>;
+		let channel2 = (await collabSpace.getCellChannel(
+			row,
+			col,
+		)) as IInternalChannel<ISharedCounter>;
+		assert(isSameChannel(channel, channel2), "getCellChannel() returns same channel");
 
 		await ensureSameValues(row, col, initialValue, [channel]);
 
 		// Collaborate a bit :)
-		channel.increment(100);
+		channel.value.increment(100);
 		initialValue += 100;
 
 		await provider.ensureSynchronized();
@@ -740,7 +804,7 @@ describe("Temporal Collab Spaces", () => {
 
 		// implementation detail: due to op grouping and issue with same sequence numbers, we need
 		// one more batch to ensure channel could be safely destroyed below (and test to validate it).
-		sendNoop(collabSpace);
+		sendSomeOpCollection[0]();
 		await provider.ensureSynchronized();
 
 		// Before channel has a chance to be saved or destroyed, let's load 3rd container from that state
@@ -755,7 +819,10 @@ describe("Temporal Collab Spaces", () => {
 		ensureSameSize();
 
 		// Also let's grab channel in second container for later manipulations
-		channel2 = (await collabSpaces[2].getCellChannel(row, col)) as ISharedCounter;
+		channel2 = (await collabSpaces[2].getCellChannel(
+			row,
+			col,
+		)) as IInternalChannel<ISharedCounter>;
 
 		await saveAndDestroyChannel(channel, collabSpace, row, col, initialValue);
 
@@ -769,11 +836,11 @@ describe("Temporal Collab Spaces", () => {
 		assert(channelInfo.channel === undefined, "channel was not removed from summary");
 
 		// recreate deleted channel
-		channel = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
+		channel = (await collabSpace.getCellChannel(row, col)) as IInternalChannel<ISharedCounter>;
 
 		// After one container destroyed the channel (and 3rd container loaded without channel),
 		// let's test that op showing up on that channel will be processed correctly by all containers.
-		channel2.increment(10);
+		channel2.value.increment(10);
 		initialValue += 10;
 		await provider.ensureSynchronized();
 		await ensureSameValues(row, col, initialValue, [channel, channel2]);
@@ -791,13 +858,19 @@ describe("Temporal Collab Spaces", () => {
 
 		const collabSpace = await initialize(20, 7);
 
-		const channel2a = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-		const channel2b = (await collabSpaces[1].getCellChannel(row, col)) as ISharedCounter;
+		const channel2a = (await collabSpace.getCellChannel(
+			row,
+			col,
+		)) as IInternalChannel<ISharedCounter>;
+		const channel2b = (await collabSpaces[1].getCellChannel(
+			row,
+			col,
+		)) as IInternalChannel<ISharedCounter>;
 
 		// Concurrent changes - clients do not see each other changes yet
-		const initialValue = channel2a.value;
-		channel2a.increment(10);
-		channel2b.increment(20);
+		const initialValue = getCollabValue(channel2a);
+		channel2a.value.increment(10);
+		channel2b.value.increment(20);
 		assert(
 			channel2a.value !== channel2b.value,
 			"test infra should not process all ops synchronously",
@@ -820,12 +893,15 @@ describe("Temporal Collab Spaces", () => {
 			const collabSpace = await initialize(20, 7);
 			const collabSpace2 = collabSpaces[1];
 
-			const channel2a = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
+			const channel2a = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
 
 			// Make some changes on a channel
-			let initialValue = channel2a.value;
+			let initialValue = getCollabValue(channel2a);
 			let overwriteValue = initialValue + 100;
-			channel2a.increment(10);
+			channel2a.value.increment(10);
 			initialValue += 10;
 
 			// We test vastly different scenario depending on if we wait or not.
@@ -847,25 +923,31 @@ describe("Temporal Collab Spaces", () => {
 			// Overwrite it!
 			collabSpace2.setCell(row, col, {
 				value: overwriteValue,
-				type: CounterFactory.Type,
+				type: TestDataObject.Type,
 			});
 
 			// syncrhonize - all containers should see exactly same changes
 			await provider.ensureSynchronized();
 			await ensureSameValues(row, col, overwriteValue);
 
-			assert(channel2a.value === initialValue, "No impact on unrooted channel");
+			assert(getCollabValue(channel2a) === initialValue, "No impact on unrooted channel");
 
 			// Retrieve channel for same cell
-			let channel2b = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-			let channel2c = (await collabSpace2.getCellChannel(row, col)) as ISharedCounter;
+			let channel2b = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
+			let channel2c = (await collabSpace2.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
 			await ensureSameValues(row, col, overwriteValue, [channel2b, channel2c]);
 
-			channel2c.increment(10);
+			channel2c.value.increment(10);
 			overwriteValue += 10;
 			await provider.ensureSynchronized();
 			await ensureSameValues(row, col, overwriteValue, [channel2b, channel2c]);
-			assert(channel2a.value === initialValue, "No impact on unrooted channel");
+			assert(getCollabValue(channel2a) === initialValue, "No impact on unrooted channel");
 
 			// Force summary to test that channel is gone.
 			if (loadSummarizer) {
@@ -885,8 +967,14 @@ describe("Temporal Collab Spaces", () => {
 				record.revert();
 			}
 			await provider.ensureSynchronized();
-			channel2b = (await collabSpace.getCellChannel(row, col)) as ISharedCounter;
-			channel2c = (await collabSpace2.getCellChannel(row, col)) as ISharedCounter;
+			channel2b = (await collabSpace.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
+			channel2c = (await collabSpace2.getCellChannel(
+				row,
+				col,
+			)) as IInternalChannel<ISharedCounter>;
 			await ensureSameValues(row, col, initialValue, [channel2b, channel2c]);
 
 			await doFinalValidation();
@@ -943,8 +1031,8 @@ describe("Temporal Collab Spaces", () => {
 		};
 
 		async function collabOnChannel(cp: IMatrix, row: number, col: number, increment: number) {
-			const channel = (await cp.getCellChannel(row, col)) as ISharedCounter;
-			channel.increment(increment);
+			const channel = (await cp.getCellChannel(row, col)) as IInternalChannel<ISharedCounter>;
+			channel.value.increment(increment);
 		}
 
 		// collaborate on a cell through collab channel
@@ -968,7 +1056,7 @@ describe("Temporal Collab Spaces", () => {
 		function createValue(value) {
 			return {
 				value,
-				type: CounterFactory.Type,
+				type: TestDataObject.Type,
 			};
 		}
 
@@ -1045,7 +1133,7 @@ describe("Temporal Collab Spaces", () => {
 		const saveChannelFn: Op = async (cp: IMatrix) => {
 			const channel = await findSomeChannelFn(cp);
 			if (channel !== undefined) {
-				addCommandToArray(`.saveChannel(${channel?.value});`);
+				addCommandToArray(`.saveChannelState(${channel.id});`);
 				cp.saveChannelState(channel);
 			} else {
 				addNoopCommand();
@@ -1055,7 +1143,7 @@ describe("Temporal Collab Spaces", () => {
 		const destroyChannelFn: Op = async (cp: IMatrix) => {
 			const channel = await findSomeChannelFn(cp);
 			if (channel !== undefined) {
-				addCommandToArray(`.destroyChannel(${channel?.value});`);
+				addCommandToArray(`.destroyChannel(${channel.id});`);
 				cp.destroyCellChannel(channel);
 			} else {
 				addNoopCommand();
@@ -1169,7 +1257,7 @@ describe("Temporal Collab Spaces", () => {
 			// 14th row is being deleted concurrently by another container (above), so this should be noop!
 			collabSpaces[1].setCell(14, 9, {
 				value: 100,
-				type: CounterFactory.Type,
+				type: TestDataObject.Type,
 			});
 
 			await provider.ensureSynchronized();

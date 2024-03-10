@@ -4,54 +4,69 @@
 
 ```ts
 
-import { IChannel } from '@fluidframework/datastore-definitions';
-import { IChannelFactory } from '@fluidframework/datastore-definitions';
+import { IFluidDataStoreChannel } from '@fluidframework/runtime-definitions';
+import { IFluidDataStoreContext } from '@fluidframework/runtime-definitions';
 import { IFluidDataStoreFactory } from '@fluidframework/runtime-definitions';
-import { IFluidDataStoreRuntime } from '@fluidframework/datastore-definitions';
 import { ISharedMatrix } from '@fluidframework/matrix';
 import { MatrixItem } from '@fluidframework/matrix';
+import { NamedFluidDataStoreRegistryEntries } from '@fluidframework/runtime-definitions';
 import { Serializable } from '@fluidframework/datastore-definitions';
 
 // @internal (undocumented)
 export type CollabSpaceCellType = MatrixItem<MatrixExternalType>;
 
 // @internal (undocumented)
-export function createCollabSpaces(sharedObjects: Readonly<ICollabChannelFactory[]>, createDebugChannel: boolean): IFluidDataStoreFactory;
+export function createCollabSpaces(registryEntries: NamedFluidDataStoreRegistryEntries): IFluidDataStoreFactory;
 
 // @internal (undocumented)
-export type ICollabChannel = IChannel & ICollabChannelCore;
+export function getCollabChannel(channel: IFluidDataStoreChannel): Promise<ICollabChannel<unknown>>;
+
+// @internal (undocumented)
+export function getCollabValue<T extends ICollabChannel>(channel: IInternalChannel<T>): T["value"];
 
 // @internal
-export interface ICollabChannelCore {
+export interface ICollabChannel<T = unknown> {
     // (undocumented)
-    readonly value: Exclude<Serializable<unknown>, undefined>;
+    readonly ICollabChannel: ICollabChannel<T>;
+    // (undocumented)
+    readonly value: Exclude<Serializable<T>, undefined>;
 }
 
 // @internal (undocumented)
-export interface ICollabChannelFactory extends IChannelFactory {
+export interface ICollabChannelFactory extends IFluidDataStoreFactory {
     // (undocumented)
-    create2(document: IFluidDataStoreRuntime, id: string, initialValue: unknown): ICollabChannel;
+    create2(context: IFluidDataStoreContext, initialValue: unknown): Promise<IFluidDataStoreChannel>;
 }
 
 // @internal (undocumented)
-export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>, "getCell"> {
+export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once"> {
     // (undocumented)
-    destroyCellChannel(channel: ICollabChannelCore): boolean;
+    destroyCellChannel(channel: IInternalChannel): boolean;
     // (undocumented)
     getAllChannels(): Promise<{
-        rooted: ICollabChannelCore[];
-        notRooted: ICollabChannelCore[];
+        rooted: IInternalChannel[];
+        notRooted: IInternalChannel[];
     }>;
     // (undocumented)
     getCell(row: number, col: number): CollabSpaceCellType;
     // (undocumented)
     getCellAsync(row: number, col: number): Promise<CollabSpaceCellType>;
     // (undocumented)
-    getCellChannel(row: number, col: number): Promise<ICollabChannelCore>;
+    getCellChannel(row: number, col: number): Promise<IInternalChannel>;
     // (undocumented)
-    saveChannelState(channel: ICollabChannelCore): SaveResult;
+    saveChannelState(channel: IInternalChannel): SaveResult;
     // (undocumented)
     setCell(rowArg: number, colArg: number, value: CollabSpaceCellType): any;
+}
+
+// @internal (undocumented)
+export interface IInternalChannel<T extends ICollabChannel = ICollabChannel> {
+    // (undocumented)
+    channel: IFluidDataStoreChannel;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    value: T;
 }
 
 // @internal (undocumented)

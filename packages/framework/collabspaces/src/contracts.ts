@@ -2,12 +2,13 @@
  * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
  * Licensed under the MIT License.
  */
+import { Serializable } from "@fluidframework/datastore-definitions";
 import {
-	IChannel,
-	Serializable,
-	IChannelFactory,
-	IFluidDataStoreRuntime,
-} from "@fluidframework/datastore-definitions";
+	IFluidDataStoreChannel,
+	IFluidDataStoreFactory,
+	IFluidDataStoreContext,
+} from "@fluidframework/runtime-definitions";
+
 import { ISharedMatrix, MatrixItem } from "@fluidframework/matrix";
 
 /**
@@ -15,16 +16,35 @@ import { ISharedMatrix, MatrixItem } from "@fluidframework/matrix";
  * Additional requirements to channel over standard IChannel interface
  * @internal
  */
-export interface ICollabChannelCore {
-	readonly value: Exclude<Serializable<unknown>, undefined>;
+export interface ICollabChannel<T = unknown> {
+	readonly value: Exclude<Serializable<T>, undefined>;
+	readonly ICollabChannel: ICollabChannel<T>;
 }
 
 /** @internal */
-export type ICollabChannel = IChannel & ICollabChannelCore;
+export interface IInternalChannel<T extends ICollabChannel = ICollabChannel> {
+	value: T;
+	channel: IFluidDataStoreChannel;
+	id: string;
+}
 
 /** @internal */
-export interface ICollabChannelFactory extends IChannelFactory {
-	create2(document: IFluidDataStoreRuntime, id: string, initialValue: unknown): ICollabChannel;
+export function getCollabValue<T extends ICollabChannel>(channel: IInternalChannel<T>): T["value"] {
+	return channel.value.value;
+}
+
+/** @internal */
+export async function getCollabChannel(channel: IFluidDataStoreChannel) {
+	const entry = await channel.entryPoint.get();
+	return (entry as ICollabChannel).ICollabChannel;
+}
+
+/** @internal */
+export interface ICollabChannelFactory extends IFluidDataStoreFactory {
+	create2(
+		context: IFluidDataStoreContext,
+		initialValue: unknown,
+	): Promise<IFluidDataStoreChannel>;
 }
 
 /** @internal */
@@ -46,7 +66,8 @@ export enum SaveResult {
 export type CollabSpaceCellType = MatrixItem<MatrixExternalType>;
 
 /** @internal */
-export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>, "getCell"> {
+export interface IEfficientMatrix
+	extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once"> {
 	// Semantics of this operation differ substantially from regular matrix.
 	// This will overwrite the value of the cell, thus creating a new collab channel (in the future)
 	// Usually used to change cell type to a different type.
@@ -65,7 +86,7 @@ export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>
 	// If collab channel already exists, it is returned. Otherwise new channel is created.
 	// While channel is active, it represents the truth for a cell. getCell*() API will
 	// return channel value while channel exists.
-	getCellChannel(row: number, col: number): Promise<ICollabChannelCore>;
+	getCellChannel(row: number, col: number): Promise<IInternalChannel>;
 
 	// Save content from channel to cell.
 	// Operation could fail (return false) for multiple reasons:
@@ -76,16 +97,16 @@ export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>
 	//  - due to FWW merge policy used, and another client either doing save or overwriting cell.
 	// This operation does not change visible characteristics of the system. It only prepares channel
 	// for future possibility to be destroyed.
-	saveChannelState(channel: ICollabChannelCore): SaveResult;
+	saveChannelState(channel: IInternalChannel): SaveResult;
 
 	// Experimental! It can be called only when condirions are right:
 	// - data has been saved to cell in non-conflicting matter.
 	//   - this means there are no channel ops in between last save's ref seq number and current point in time!
 	// - no records on undo stack
 	// Returns true if channel was actually destroyed.
-	destroyCellChannel(channel: ICollabChannelCore): boolean;
+	destroyCellChannel(channel: IInternalChannel): boolean;
 
-	getAllChannels(): Promise<{ rooted: ICollabChannelCore[]; notRooted: ICollabChannelCore[] }>;
+	getAllChannels(): Promise<{ rooted: IInternalChannel[]; notRooted: IInternalChannel[] }>;
 }
 
 /**
@@ -99,7 +120,7 @@ export interface IEfficientMatrixTest {
 	getCellDebugInfo(
 		row: number,
 		col: number,
-	): Promise<{ channel?: ICollabChannelCore; channelId: string; rowId: string; colId: string }>;
+	): Promise<{ channel?: IInternalChannel; rowId: string; colId: string }>;
 
 	getReverseMapsDebugInfo(): Readonly<{
 		rowMap: { [id: string]: number };
@@ -107,7 +128,4 @@ export interface IEfficientMatrixTest {
 	}>;
 
 	getReverseMapCellDebugInfo(rowId: string, colId: string): Promise<{ row: number; col: number }>;
-
-	// Only works if there is debug channel created.
-	sendSomeDebugOp(): void;
 }

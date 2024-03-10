@@ -4,44 +4,48 @@
  */
 
 import { assert } from "@fluidframework/core-utils";
-import { FluidObject, IRequest, IResponse } from "@fluidframework/core-interfaces";
+import { IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 
 import {
 	ISummaryTreeWithStats,
 	ITelemetryContext,
-	IFluidDataStoreContext,
-	IAttachMessage,
+	IEnvelope,
+	IFluidDataStoreChannel,
+	NamedFluidDataStoreRegistryEntries,
+	FluidDataStoreRegistryEntry,
 } from "@fluidframework/runtime-definitions";
-import {
-	IChannel,
-	IChannelFactory,
-	IFluidDataStoreRuntime,
-} from "@fluidframework/datastore-definitions";
-import { FluidDataStoreRuntime } from "@fluidframework/datastore";
 import {
 	SharedMatrix,
 	SharedMatrixFactory,
 	MatrixItem,
-	ISharedMatrixEvents,
 	IUndoConsumer,
 } from "@fluidframework/matrix";
 import { UsageError } from "@fluidframework/telemetry-utils";
-import { addBlobToSummary } from "@fluidframework/runtime-utils";
+import { addBlobToSummary, encodeCompactIdToString } from "@fluidframework/runtime-utils";
 import { readAndParse } from "@fluidframework/driver-utils";
+import {
+	ChannelCollection,
+	LocalFluidDataStoreContextBase,
+	LocalFluidDataStoreContext,
+} from "@fluidframework/container-runtime";
+import { AttachState } from "@fluidframework/container-definitions";
 import { IMatrixConsumer, IMatrixReader, IMatrixProducer } from "@tiny-calc/nano";
-import { v4 as uuid } from "uuid";
+
 import {
 	MatrixExternalType,
-	ICollabChannel,
-	ICollabChannelCore,
+	IInternalChannel,
 	IEfficientMatrix,
+	IEfficientMatrixTest,
 	ICollabChannelFactory,
 	CollabSpaceCellType,
 	SaveResult,
+	getCollabValue,
+	getCollabChannel,
 } from "./contracts";
-import { DeferredChannel, DeferredChannelFactory } from "./deferreChannel";
+import { DeferredChannel } from "./deferreChannel";
 import { ReverseMap, ReverseMapType } from "./reverseMap";
+import { MatrixDataStoreFactory } from "./factory.js";
 
 /*
  * This is a prototype, an implementation of sparse matrix that natively supports collaboration.
@@ -120,11 +124,12 @@ import { ReverseMap, ReverseMapType } from "./reverseMap";
  *    be optimized to be fast, especially for main case (no channel)
  */
 
-const matrixId = "matrix";
-const debugChannelId = "debug";
+// TBD(Pri0): Need aliasing capability to find right data store!
+const matrixId = "A";
+
 const channelSummaryBlobName = "channelInfo";
 
-export type uuidType = number | string;
+export type uuidType = string;
 
 interface MatrixInternalType extends MatrixExternalType {
 	// This is channel ID modifier.
@@ -139,18 +144,22 @@ interface MatrixInternalType extends MatrixExternalType {
 	seq: number;
 }
 
-type ICellInfo =
+type ICellInfo = {
+	rowId: string;
+	colId: string;
+} & (
 	| {
 			value: undefined;
-			channel?: undefined;
-			channelId?: undefined;
+			channel?: never;
+			channelId?: never;
 	  }
 	| {
 			value: Exclude<MatrixItem<MatrixInternalType>, undefined>;
-			channel: Promise<ICollabChannel> | undefined;
+			channel: Promise<IFluidDataStoreChannel> | undefined;
 			channelId: string;
 			channelInfo: IChannelTrackingInfo | undefined;
-	  };
+	  }
+);
 
 const ChannelInfoCreatedDetachedSeq = -2;
 const ChannelInfoCreatedAttachedSeq = -1;
@@ -182,6 +191,72 @@ function isChannelDeferred(type?: string) {
 	return type === DeferredChannel.Type;
 }
 
+export async function getInternalChannel(
+	id: string,
+	channelP: Promise<IFluidDataStoreChannel>,
+): Promise<IInternalChannel> {
+	const channel = await channelP;
+	const value = await getCollabChannel(channel);
+	return {
+		value,
+		id,
+		channel,
+	};
+}
+
+class SpecialLocalContext extends LocalFluidDataStoreContextBase {
+	constructor(props) {
+		super(props);
+		assert(this.pkg !== undefined, 0x14a /* "Undefined package path" */);
+	}
+
+	public delete() {
+		this.deleted = true;
+	}
+
+	public attachRuntime(dataStoreChannel: Promise<IFluidDataStoreChannel>) {
+		assert(this.channelP === undefined, 0x155 /* "channel deferral is already set" */);
+
+		this.channelP = Promise.resolve()
+			.then(async () => {
+				const channel = await dataStoreChannel;
+				await this.bindRuntime(channel, false /* existing */);
+				return channel;
+			})
+			.catch((error) => {
+				this.mc.logger.sendErrorEvent({ eventName: "AttachRuntimeError" }, error);
+				// The following two lines result in same exception thrown.
+				// But we need to ensure that this.channelDeferred.promise is "observed", as otherwise
+				// out UT reports unhandled exception
+				throw error;
+			});
+	}
+
+	protected async bindRuntime(channel: IFluidDataStoreChannel, existing: boolean) {
+		if (this.channel) {
+			throw new Error("Runtime already bound");
+		}
+
+		this.completeBindingRuntime(channel);
+		channel.makeVisibleAndAttachGraph();
+		if (this.attachState !== AttachState.Detached) {
+			this.setAttachState(AttachState.Attached);
+		}
+		this.processPendingOps(channel);
+
+		if (!existing) {
+			// Execute data store's entry point to make sure that for a local (aka detached from container) data store, the
+			// entryPoint initialization function is called before the data store gets attached and potentially connected to
+			// the delta stream, so it gets a chance to do things while the data store is still "purely local".
+			// This preserves the behavior from before we introduced entryPoints, where the instantiateDataStore method
+			// of data store factories tends to construct the data object (at least kick off an async method that returns
+			// it); that code moved to the entryPoint initialization function, so we want to ensure it still executes
+			// before the data store is attached.
+			await channel.entryPoint.get();
+		}
+	}
+}
+
 /*
 	// TBD(Pri2) - to be implemented:
 	- "conflict" events
@@ -194,8 +269,8 @@ function isChannelDeferred(type?: string) {
 
 /** @internal */
 export class CollabSpacesRuntime
-	extends FluidDataStoreRuntime<ISharedMatrixEvents<MatrixExternalType>>
-	implements IEfficientMatrix
+	extends ChannelCollection
+	implements IEfficientMatrix, IEfficientMatrixTest
 {
 	private matrixInternal?: SharedMatrix<MatrixInternalType>;
 	private channelInfo: Record<string, IChannelTrackingInfo | undefined> = {};
@@ -203,30 +278,29 @@ export class CollabSpacesRuntime
 	private readonly reverseMap: ReverseMap = new ReverseMap();
 	private deferredChannels: Map<string, DeferredChannel> = new Map();
 	private matrixPendingChangeCount = 0;
-	private debugChannel?: DeferredChannel = undefined;
-	constructor(
-		dataStoreContext: IFluidDataStoreContext,
-		sharedObjects: Readonly<ICollabChannelFactory[]>,
-		existing: boolean,
-		provideEntryPoint: (runtime: IFluidDataStoreRuntime) => Promise<FluidObject>,
-	) {
-		const factories: IChannelFactory[] = [
-			...sharedObjects,
-			new SharedMatrixFactory(),
-			new DeferredChannelFactory(),
-		];
-		const sharedObjectRegistry = new Map(factories.map((ext) => [ext.type, ext]));
+	private readonly registry: Map<string, Promise<FluidDataStoreRegistryEntry>> = new Map();
 
-		super(dataStoreContext, sharedObjectRegistry, existing, provideEntryPoint);
+	constructor(
+		registryEntries: NamedFluidDataStoreRegistryEntries,
+		...args: ConstructorParameters<typeof ChannelCollection>
+	) {
+		super(...args);
+		for (const [name, factory] of registryEntries) {
+			this.registry.set(name, factory);
+		}
+	}
+
+	public get isAttached() {
+		return this.parentContext.attachState !== AttachState.Detached;
 	}
 
 	private criticalError(error): never {
-		this.logger.sendErrorEvent({ eventName: "CollabSpaces" }, error);
+		this.mc.logger.sendErrorEvent({ eventName: "CollabSpaces" }, error);
 		throw error;
 	}
 
 	private isCollabChannel(channelId) {
-		return matrixId !== channelId && debugChannelId !== channelId;
+		return matrixId !== channelId;
 	}
 
 	private channelExists(id) {
@@ -236,10 +310,10 @@ export class CollabSpacesRuntime
 	private enumerateCollabChannels() {
 		return Array.from(this.contexts)
 			.filter(([channelId, _]) => this.isCollabChannel(channelId))
-			.map(
-				([channelId, context]) =>
-					[channelId, context.getChannel()] as [string, Promise<IChannel>],
-			);
+			.map(([channelId, context]) => {
+				const channel = context.realize();
+				return [channelId, channel] as [string, typeof channel];
+			});
 	}
 
 	// Called on various paths, like op processing, where channel should exists.
@@ -266,13 +340,11 @@ export class CollabSpacesRuntime
 			let deferredChannel = true;
 			const mapping = this.mapChannelToCell(address);
 			if (mapping !== undefined) {
-				// TBD(Pri2): It would be useful to put a factory type on every op, such that we can
-				// cross-reference it against currValue.type
-				this.createCollabChannel(mapping.value, address);
+				this.createCollabChannelIgnore(mapping.value, address);
 				deferredChannel = false;
 			}
 			if (deferredChannel) {
-				this.createCollabChannel(
+				this.createCollabChannelIgnore(
 					{
 						// That's the only place where we allow undefined as a value
 						// All other places should not allow that.
@@ -295,28 +367,19 @@ export class CollabSpacesRuntime
 		return record;
 	}
 
-	protected setChannelDirty(address: string): void {
-		// TBD(Pri2): Need to review the structure here, and ensure that we do not
-		// support channel calling this API, as we have no mechanism to take that into account.
-		// Currently it is used to force summary for a channel, but such channels
-		// likely can't be used for temp collab spaces, as we could destroy them prematurely.
-		// We could likely take it into account, but not clear if it's needed yet.
-		super.setChannelDirty(address);
-	}
-
-	protected async applyStashedChannelChannelOp(address: string, contents: any) {
+	protected async applyStashedChannelChannelOp(envelope: IEnvelope) {
 		// This operation does not change counter, at least not directly.
 		// It will result in channel sending op, and that's how it will be accounted for.
 		// That said, need to ensure we have a channel allocated for it.
-		this.updatePendingCounter(address, 0, true /* allowImplicitCreation */);
-		return super.applyStashedChannelChannelOp(address, contents);
+		this.updatePendingCounter(envelope.address, 0, true /* allowImplicitCreation */);
+		return super.applyStashedChannelChannelOp(envelope);
 	}
 
 	protected processChannelOp(
 		address: string,
 		message: ISequencedDocumentMessage,
 		local: boolean,
-		localOpMetadata: unknown,
+		localMessageMetadata: unknown,
 	) {
 		// offset increase by submitChannelOp()
 		const record = this.updatePendingCounter(
@@ -329,30 +392,32 @@ export class CollabSpacesRuntime
 			record.seq = message.sequenceNumber;
 		}
 
-		super.processChannelOp(address, message, local, localOpMetadata);
+		super.processChannelOp(address, message, local, localMessageMetadata);
 	}
 
-	protected reSubmitChannelOp(address: string, contents: any, localOpMetadata: unknown) {
+	protected reSubmitChannelOp(type: string, content: any, localOpMetadata: unknown) {
 		// Message was not sent, so our +1 in submitChannelOp() needs to be offset
 		// DDS may chose to send any number of ops (including zero) as part of resubmit flow
 		// All such ops would be properly accounted on submitChannelOp() path.
-		this.updatePendingCounter(address, -1, false /* allowImplicitCreation */);
-		super.reSubmitChannelOp(address, contents, localOpMetadata);
+		const envelope = content as IEnvelope;
+		this.updatePendingCounter(envelope.address, -1, false /* allowImplicitCreation */);
+		super.reSubmitChannelOp(type, content, localOpMetadata);
 	}
 
-	protected submitChannelOp(address: string, contents: any, localOpMetadata: unknown) {
-		this.updatePendingCounter(address, 1, false /* allowImplicitCreation */);
-		super.submitChannelOp(address, contents, localOpMetadata);
+	protected wrapContextForInnerChannel(id: string) {
+		const context = super.wrapContextForInnerChannel(id);
+
+		const submitMessageOriginal = context.submitMessage.bind(context);
+
+		context.submitMessage = (type: string, content: any, localOpMetadata: unknown) => {
+			submitMessageOriginal(type, content, localOpMetadata);
+			this.updatePendingCounter(id, 1, false /* allowImplicitCreation */);
+		};
+
+		return context;
 	}
 
-	protected sendAttachChannelOp(channel: IChannel): void {
-		// TBD(Pri3): review later
-		// Sending op is optional (and whole system has to work correctly without such ops)
-		// That said, sending it is useful for validation purposes (to validate we start with same state)
-		if (this.isCollabChannel(channel.id)) {
-			super.sendAttachChannelOp(channel);
-		}
-	}
+	protected submitAttachChannelOp(localContext: LocalFluidDataStoreContext): void {}
 
 	public processSignal(message: any, local: boolean) {
 		this.criticalError(new Error("Not supported"));
@@ -395,8 +460,8 @@ export class CollabSpacesRuntime
 	}
 
 	public async summarize(
-		fullTree?: boolean,
-		trackState?: boolean,
+		fullTree: boolean,
+		trackState: boolean,
 		telemetryContext?: ITelemetryContext,
 	): Promise<ISummaryTreeWithStats> {
 		assert(this.matrixPendingChangeCount === 0, "there should be no changes by summarizer!");
@@ -404,7 +469,7 @@ export class CollabSpacesRuntime
 		// Do some garbage collection for channels that we do not need.
 		for (const [channelId, channel] of this.enumerateCollabChannels()) {
 			const info = this.saveOrDestroyChannel(
-				(await channel) as ICollabChannel,
+				await getInternalChannel(channelId, channel),
 				false /* allowSave */,
 				true /* allowDestroy */,
 			);
@@ -419,96 +484,55 @@ export class CollabSpacesRuntime
 		return summary;
 	}
 
-	protected attachRemoteChannel(
-		id: string,
-		sequenceNumber: number,
-		attachMessage: IAttachMessage,
-	) {
-		if (!this.channelExists(id)) {
-			super.attachRemoteChannel(id, sequenceNumber, attachMessage);
-			if (this.isCollabChannel(id)) {
-				// This should never happen, but if it does - this points to an issue of
-				// not tracking it properly in this.deferredChannels
-				assert(!isChannelDeferred(attachMessage.type), "deferred channels tracking");
-				this.channelCreated(id, attachMessage.type);
-			}
-		} else {
-			// TBD(Pri2) - we should verify that initial state conveyed in this op is exactly
-			// the same as the one this client started with.
-		}
-	}
-
 	/**
 	 * Public API
 	 */
 
-	public sendSomeDebugOp() {
-		// TBD(Pri0): remove cast by refactoring
-		(this.debugChannel as any).submitLocalMessage("foo");
-	}
-
 	// Should be called by data store runtime factory
-	public async initialize(existing: boolean, createDebugChannel: boolean) {
+	public async initialize(existing: boolean) {
 		if (!existing) {
-			this.matrixInternal = this.createChannel(
-				matrixId,
-				SharedMatrixFactory.Type,
-			) as SharedMatrix;
-
-			// Insert row/col for tracking row/col internal IDs
-			this.matrixInternal.insertCols(0, 1);
-			this.matrixInternal.insertRows(0, 1);
-
-			// Ensure it will attach when this data store attaches
-			this.matrixInternal.bindToContext();
-
-			if (createDebugChannel) {
-				this.debugChannel = this.createChannel(
-					debugChannelId,
-					DeferredChannel.Type,
-				) as DeferredChannel;
-				this.debugChannel.bindToContext();
-			}
+			const channel = await this.createDataStoreContext([
+				MatrixDataStoreFactory.type,
+			]).realize();
+			channel.makeVisibleAndAttachGraph();
 		} else {
-			this.matrixInternal = (await this.getChannel(matrixId)) as SharedMatrix;
-
-			assert(this.dataStoreContext.baseSnapshot !== undefined, "loading from snasphot");
-			const blobId = this.dataStoreContext.baseSnapshot.blobs[channelSummaryBlobName];
+			assert(this.baseSnapshot !== undefined, "loading from snasphot");
+			const blobId = this.baseSnapshot.blobs[channelSummaryBlobName];
 			assert(blobId !== undefined, "channelInfo not present");
 			this.channelInfo = await readAndParse<Record<string, IChannelTrackingInfo>>(
-				this.dataStoreContext.storage,
+				this.parentContext.storage,
 				blobId,
 			);
+		}
 
-			// Rebuild deferred channels
-			this.deferredChannels = new Map();
-			for (const [channelId, info] of Object.entries(this.channelInfo)) {
-				if (isChannelDeferred(info?.type)) {
-					const channel = await this.getChannel(channelId);
-					this.deferredChannels.set(channelId, channel as DeferredChannel);
-				}
-			}
+		this.matrixInternal = (await (
+			await this.contexts.get(matrixId)?.realize()
+		)?.entryPoint.get()) as SharedMatrix;
 
-			if (createDebugChannel) {
-				this.debugChannel = (await this.getChannel(debugChannelId)) as DeferredChannel;
-			}
-
-			for (let row = 1; row < this.matrixInternal.rowCount; row++) {
-				this.reverseMap.addCellToMap(
-					"row",
-					this.matrixInternal.getCell(row, 0) as unknown as uuidType,
-					row - 1,
-				);
-			}
-			for (let col = 1; col < this.matrixInternal.colCount; col++) {
-				this.reverseMap.addCellToMap(
-					"col",
-					this.matrixInternal.getCell(0, col) as unknown as uuidType,
-					col - 1,
-				);
+		// Rebuild deferred channels
+		this.deferredChannels = new Map();
+		for (const [channelId, info] of Object.entries(this.channelInfo)) {
+			if (isChannelDeferred(info?.type)) {
+				const channel = await this.contexts.get(channelId)?.realize();
+				assert(channel !== undefined, "deffered channel not present");
+				this.deferredChannels.set(channelId, channel as DeferredChannel);
 			}
 		}
-		this.matrix.switchSetCellPolicy();
+
+		for (let row = 1; row < this.matrixInternal.rowCount; row++) {
+			this.reverseMap.addCellToMap(
+				"row",
+				this.matrixInternal.getCell(row, 0) as unknown as uuidType,
+				row - 1,
+			);
+		}
+		for (let col = 1; col < this.matrixInternal.colCount; col++) {
+			this.reverseMap.addCellToMap(
+				"col",
+				this.matrixInternal.getCell(0, col) as unknown as uuidType,
+				col - 1,
+			);
+		}
 
 		this.matrix.openMatrix({
 			rowsChanged: (rowStart: number, removedCount: number, insertedCount: number) => {
@@ -586,7 +610,7 @@ export class CollabSpacesRuntime
 				"no pending changes for deferred channel",
 			);
 			this.channelInfo[channelId] = undefined;
-			this.createCollabChannel(info.value, channelId);
+			this.createCollabChannelIgnore(info.value, channelId);
 			for (const op of deferredChannel.getOps()) {
 				this.processChannelOp(channelId, op, false /* local */, undefined /* metadata */);
 			}
@@ -601,13 +625,13 @@ export class CollabSpacesRuntime
 		const rowId = this.matrix.getCell(row, 0) as unknown as uuidType;
 		const colId = this.matrix.getCell(0, col) as unknown as uuidType;
 		if (cellValue === undefined) {
-			return { value: undefined, channel: undefined };
+			return { value: undefined, rowId, colId };
 		}
 		if (rowId === undefined || colId === undefined) {
 			throw new Error(`rowId or colId is undefined for row: ${row}, col: ${col}`);
 		}
 		const channelId = `${rowId},${colId},${cellValue.iteration}`;
-		const channel = this.contexts.get(channelId)?.getChannel();
+		const channel = this.contexts.get(channelId)?.realize();
 
 		const channelInfo = this.channelInfo[channelId];
 		if (channel !== undefined) {
@@ -621,9 +645,11 @@ export class CollabSpacesRuntime
 
 		return {
 			value: cellValue,
-			channel: channel as Promise<ICollabChannel> | undefined,
+			channel,
 			channelId,
 			channelInfo,
+			rowId,
+			colId,
 		};
 	}
 
@@ -631,16 +657,13 @@ export class CollabSpacesRuntime
 	public async getCellDebugInfo(
 		row: number,
 		col: number,
-	): Promise<{
-		channel?: ICollabChannelCore;
-		channelId?: string;
-		rowId?: string;
-		colId?: string;
-	}> {
+	): Promise<{ channel?: IInternalChannel; rowId: string; colId: string }> {
 		const result = this.getCellInfo(row, col);
-		const info = result.channelId !== undefined ? this.parseChannelId(result.channelId) : {};
-		const channel = await result.channel;
-		return { channel, channelId: result.channelId, ...info };
+		const channel =
+			result.channel !== undefined
+				? await getInternalChannel(result.channelId, result.channel)
+				: undefined;
+		return { ...result, channel };
 	}
 
 	public async getReverseMapCellDebugInfo(
@@ -672,13 +695,14 @@ export class CollabSpacesRuntime
 		};
 	}
 
-	private getFactoryForValueType(type: string, onlyCollaborativeTypes: boolean) {
+	// eslint-disable-next-line @typescript-eslint/promise-function-async
+	private getFactoryForValueType(type: string) {
 		// Matrix is in the list of channels, but it's "internal" type - not allowed to be used in cells.
 		if (type === SharedMatrixFactory.Type) {
 			return undefined;
 		}
-		const factory = this.sharedObjectRegistry.get(type);
-		return factory as ICollabChannelFactory;
+		const factoryP = this.registry.get(type);
+		return factoryP as Promise<ICollabChannelFactory> | undefined;
 	}
 
 	private channelCreated(channelId: string, type: string) {
@@ -691,47 +715,48 @@ export class CollabSpacesRuntime
 		};
 	}
 
+	private createCollabChannelIgnore(value: MatrixExternalType, channelId: string) {
+		this.createCollabChannel(value, channelId).catch((error) => {});
+	}
+
 	// TBD(Pri2): We need to deal with GC data. This channel might have references to other resources (like images,
 	// or even other data stores.
 	// Logic should follow something similar to what happens in DataStoreRuntime.process() - see call to
 	// processAttachMessageGCData().
+	// eslint-disable-next-line @typescript-eslint/promise-function-async
 	private createCollabChannel(value: MatrixExternalType, channelId: string) {
-		const factory = this.getFactoryForValueType(value.type, true /* onlyCollaborativeTypes */);
-		assert(factory !== undefined, "Factory is missing for matrix type");
-
-		const newChannel = factory.create2(this, channelId, value.value);
-		this.addChannel(newChannel);
-
-		// TBD(Pri2) - make sure it is properly attached to data store.
-		// Everywhere in code we call appropriate newChannel.bindToContext(), but that's not an API on a channel interface.
-		// Feels like I should call this.bindChannel(newChannel) here, but it fails - this.notBoundedChannelContextSet
-		// gets cleared first and then we get back (recursion) into this.bindChannel() and hit assert.
-		// this.bind(newChannel.handle) does not seem to work properly if this happens in detached container.
-		// newChannel.handle.attachGraph() seems like works the best, even though it's deprecated.
-		// We can add bindToContext() to ICollabChannelCore, but it feels like that should be better way to do it!
-		newChannel.handle.attachGraph();
-		// this.bind(newChannel.handle)
-		// this.bindChannel(newChannel);
-
 		this.channelCreated(channelId, value.type);
 		assert(!this.deferredChannels.has(channelId), "overwriting deferred channel");
-		if (isChannelDeferred(value.type)) {
-			this.deferredChannels.set(channelId, newChannel as DeferredChannel);
-		}
 
-		return newChannel;
+		const context = this.createContext(
+			channelId,
+			[value.type], // pkg
+			SpecialLocalContext,
+		);
+
+		const factoryP = this.getFactoryForValueType(value.type);
+		assert(factoryP !== undefined, "Factory is missing for matrix type");
+
+		const channel = factoryP.then(async (factory) => {
+			const newChannel = await factory.create2(context, value.value);
+			if (isChannelDeferred(value.type)) {
+				this.deferredChannels.set(channelId, newChannel as DeferredChannel);
+			}
+			return newChannel;
+		});
+
+		context.attachRuntime(channel);
+
+		return channel;
 	}
 
-	public async getCellChannel(row: number, col: number): Promise<ICollabChannelCore> {
+	public async getCellChannel(row: number, col: number) {
 		const { value, channel, channelId } = this.getCellInfo(row, col);
 		if (value === undefined) {
 			throw new UsageError("Can't create channel for undefined cell");
 		}
-		if (channel !== undefined) {
-			return channel;
-		}
 
-		return this.createCollabChannel(value, channelId);
+		return getInternalChannel(channelId, channel ?? this.createCollabChannel(value, channelId));
 	}
 
 	private parseChannelId(channelId: string): { rowId: string; colId: string; iteration: string } {
@@ -827,11 +852,10 @@ export class CollabSpacesRuntime
 
 	private destroyChannelCore(channelId: string) {
 		// Force summarizer sub-system to summarize this object and get rid of deleted channel
-		this.setChannelDirty(channelId);
+		this.parentContext.setChannelDirty(channelId);
 
 		// Is this safe? Anything else we need to do?
 		this.contexts.delete(channelId);
-		this.notBoundedChannelContextSet.delete(channelId);
 		this.channelInfo[channelId] = undefined;
 
 		// TBD(Pri2): We need to update GC data and ensure that it's accurate.
@@ -839,16 +863,16 @@ export class CollabSpacesRuntime
 		// represents same data, but need to double check that it's actually correct and tests
 		// have proper coverage.
 
-		this.dataStoreContext.deleteChildSummarizerNode(channelId);
+		this.parentContext.deleteChildSummarizerNode(channelId);
 	}
 
 	// Saves or destroys channel, depending on the arguments
 	private saveOrDestroyChannel(
-		channel: ICollabChannelCore,
+		channel: IInternalChannel,
 		allowSave: boolean,
 		allowDestroy: boolean,
 	): { saveResult: SaveResult; destroyed: boolean } {
-		const channelId = (channel as ICollabChannel).id;
+		const channelId = channel.id;
 
 		const channelnfo = this.channelInfo[channelId];
 		assert(channelnfo !== undefined, "every channel should have a record");
@@ -908,7 +932,7 @@ export class CollabSpacesRuntime
 				destroyed = true;
 			}
 		} else {
-			const currSeq = this.deltaManager.lastSequenceNumber;
+			const currSeq = this.parentContext.deltaManager.lastSequenceNumber;
 			assert(channelnfo.seq <= currSeq, "invalid seq number");
 			assert(value.seq <= channelnfo.seq, "invalid seq number");
 
@@ -921,14 +945,14 @@ export class CollabSpacesRuntime
 			}
 
 			// TBD(Pri1)
-			// There is value in sending save ops if they can't get through - we would keep accumulating
+			// There is value in sending save ops if they can't get through, but we would keep accumulating
 			// such ops infinitely (in offline). Better workflow would be
 			// 1. Always track any pending save op for channel and not send any new ops until previous acks.
 			// 2. (Optional) Have more nuanced rebase policy for such ops not to send garbage once we reconnect.
 			if (
-				!this.connected ||
-				this.clientId === undefined ||
-				this.getQuorum().getMember(this.clientId) === undefined
+				!this.parentContext.connected ||
+				this.parentContext.clientId === undefined ||
+				this.parentContext.getQuorum().getMember(this.parentContext.clientId) === undefined
 			) {
 				return { saveResult: SaveResult.CantSave, destroyed: false };
 			}
@@ -944,7 +968,7 @@ export class CollabSpacesRuntime
 				channelnfo.seq <= value.seq &&
 				// 2. There is no need for a channel to preserve extra historic state to be able apply future ops that
 				//    might have reference sequence number in the past (in between MSN and current sequence number)
-				channelnfo.seq <= this.deltaManager.minimumSequenceNumber;
+				channelnfo.seq <= this.parentContext.deltaManager.minimumSequenceNumber;
 		}
 
 		assert(
@@ -962,7 +986,7 @@ export class CollabSpacesRuntime
 		if (saved) {
 			savedValue = {
 				...savedValue, // value, iteration, type
-				value: channel.value,
+				value: getCollabValue(channel),
 				seq: refSeq,
 			};
 			this.matrix.setCell(row, col, savedValue);
@@ -975,7 +999,7 @@ export class CollabSpacesRuntime
 
 		if (destroyed) {
 			// Validate that actually values match!
-			assert(channel.value === savedValue.value, "values are not matching!!!!");
+			assert(getCollabValue(channel) === savedValue.value, "values are not matching!!!!");
 			this.destroyChannelCore(channelId);
 		}
 
@@ -985,12 +1009,12 @@ export class CollabSpacesRuntime
 		};
 	}
 
-	public saveChannelState(channel: ICollabChannelCore) {
+	public saveChannelState(channel: IInternalChannel) {
 		return this.saveOrDestroyChannel(channel, true /* allowSave */, false /* allowDestroy */)
 			.saveResult;
 	}
 
-	public destroyCellChannel(channel: ICollabChannelCore) {
+	public destroyCellChannel(channel: IInternalChannel) {
 		const res = this.saveOrDestroyChannel(
 			channel,
 			// If channel is detached, we can only do save & destroy - neither save nor destroy
@@ -1004,16 +1028,17 @@ export class CollabSpacesRuntime
 	}
 
 	public async getAllChannels() {
-		const channelsNotRootedP: Promise<IChannel>[] = [];
-		const channelsRootedP: Promise<IChannel>[] = [];
+		const channelsNotRootedP: Promise<IInternalChannel>[] = [];
+		const channelsRootedP: Promise<IInternalChannel>[] = [];
 
 		for (const [id, channel] of this.enumerateCollabChannels()) {
 			assert(this.channelInfo[id] !== undefined, "channel not found");
 			const mapping = this.mapChannelToCell(id);
+			const internalChannelP = getInternalChannel(id, channel);
 			if (mapping !== undefined) {
-				channelsRootedP.push(channel);
+				channelsRootedP.push(internalChannelP);
 			} else {
-				channelsNotRootedP.push(channel);
+				channelsNotRootedP.push(internalChannelP);
 			}
 		}
 
@@ -1036,8 +1061,8 @@ export class CollabSpacesRuntime
 			assert(mapping === undefined, "deffered channel can't be rooted");
 		}
 
-		const rooted = (await Promise.all(channelsRootedP)) as ICollabChannel[];
-		const notRooted = (await Promise.all(channelsNotRootedP)) as ICollabChannel[];
+		const rooted = await Promise.all(channelsRootedP);
+		const notRooted = await Promise.all(channelsNotRootedP);
 
 		return { rooted, notRooted };
 	}
@@ -1076,7 +1101,7 @@ export class CollabSpacesRuntime
 		}
 		let val = value.value;
 		if (channel !== undefined) {
-			val = (await channel).value;
+			val = (await getCollabChannel(await channel)).value;
 		}
 		return { value: val, type: value.type };
 	}
@@ -1100,10 +1125,7 @@ export class CollabSpacesRuntime
 			this.matrix.setCell(row, col, value);
 		} else {
 			// Check that we will be able to create a channel for it in the future.
-			if (
-				this.getFactoryForValueType(value.type, false /* onlyCollaborativeTypes */) ===
-				undefined
-			) {
+			if (this.getFactoryForValueType(value.type) === undefined) {
 				throw new UsageError("Matrix: Unknown value type");
 			}
 
@@ -1117,13 +1139,9 @@ export class CollabSpacesRuntime
 	// #endregion IMatrixWriter
 
 	private uuid(): uuidType {
-		const compressor = this.dataStoreContext.idCompressor;
-		if (compressor !== undefined) {
-			const id = compressor.generateCompressedId();
-			// TBD(Pri2): Need to replace negative test with proper function exposed by compressor
-			return id < 0 ? compressor.decompress(id) : id;
-		}
-		return uuid();
+		return encodeCompactIdToString(
+			this.parentContext.containerRuntime.generateDocumentUniqueId(),
+		);
 	}
 
 	private areEqualUuid(u1: uuidType, u2: string) {
