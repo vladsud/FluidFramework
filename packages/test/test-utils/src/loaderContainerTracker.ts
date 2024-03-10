@@ -3,7 +3,12 @@
  * Licensed under the MIT License.
  */
 import { assert } from "@fluidframework/core-utils";
-import { IContainer, IDeltaQueue, IHostLoader } from "@fluidframework/container-definitions";
+import {
+	AttachState,
+	IContainer,
+	IDeltaQueue,
+	IHostLoader,
+} from "@fluidframework/container-definitions";
 import { ConnectionState } from "@fluidframework/container-loader";
 import { canBeCoalescedByService } from "@fluidframework/driver-utils";
 import {
@@ -768,6 +773,8 @@ export class LoaderContainerTracker implements IOpProcessingController {
 	private getContainers(containers: IContainer[]) {
 		const containersToApply =
 			containers.length === 0 ? Array.from(this.containers.keys()) : containers;
-		return containersToApply.filter((container) => !container.closed);
+		return containersToApply.filter(
+			(container) => !container.closed && container.attachState !== AttachState.Detached,
+		);
 	}
 }
