@@ -1169,9 +1169,6 @@ export class LocalFluidDataStoreContextBase extends FluidDataStoreContext {
 		this.identifyLocalChangeInSummarizer("DataStoreCreatedInSummarizer");
 
 		this.snapshotTree = props.snapshotTree;
-		if (props.isRootDataStore === true) {
-			this.setInMemoryRoot();
-		}
 		this.createProps = props.createProps;
 	}
 
