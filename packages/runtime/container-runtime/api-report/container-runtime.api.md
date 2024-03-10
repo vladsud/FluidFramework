@@ -522,6 +522,12 @@ export interface IEnqueueSummarizeOptions extends IOnDemandSummarizeOptions {
     readonly override?: boolean;
 }
 
+// @internal (undocumented)
+export interface IFluidDataStoreContextEvents extends IEvent_2 {
+    // (undocumented)
+    (event: "attaching" | "attached", listener: () => void): any;
+}
+
 // @internal
 export interface IFluidDataStoreContextInternal extends IFluidDataStoreContext {
     // (undocumented)

@@ -101,4 +101,8 @@ export {
 } from "./summary/index.js";
 export { IChunkedOp, unpackRuntimeMessage } from "./opLifecycle/index.js";
 export { ChannelCollection } from "./channelCollection.js";
-export { IFluidDataStoreContextInternal, ISnapshotDetails } from "./dataStoreContext.js";
+export {
+	IFluidDataStoreContextInternal,
+	ISnapshotDetails,
+	IFluidDataStoreContextEvents,
+} from "./dataStoreContext.js";
