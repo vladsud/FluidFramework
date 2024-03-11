@@ -18,7 +18,6 @@ export interface ISharedCounter extends ICollabChannel {
 	value: number;
 	readonly ICollabChannel: ICollabChannel;
 	increment(incrementAmount: number): void;
-	// isAttached(): boolean;
 }
 
 class TestDataObjectFactory
@@ -30,7 +29,6 @@ class TestDataObjectFactory
 			context,
 			false /* existing */,
 		)) as IFluidDataStoreRuntime & IFluidDataStoreChannel;
-		// const entry = await channel.entryPoint.get() as TestDataObject;
 
 		const counter = (await channel.getChannel("counter")) as SharedCounter;
 		counter.increment(initialValue as number);
@@ -71,18 +69,12 @@ export class TestDataObject extends DataObject implements ISharedCounter {
 			this.runtime,
 			SharedCounter.getFactory().attributes,
 		);
-		counter.initializeLocal();
 		this.runtime.addChannel(counter);
 		counter.bindToContext();
 	}
 
 	public async hasInitialized(): Promise<void> {
 		this._counter = (await this.runtime.getChannel("counter")) as SharedCounter;
-	}
-
-	public sendSomeOp() {
-		assert(this._counter !== undefined, "no cunter");
-		this._counter.increment(1);
 	}
 
 	constructor(props: IDataObjectProps) {

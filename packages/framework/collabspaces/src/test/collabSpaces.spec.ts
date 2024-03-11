@@ -158,7 +158,7 @@ describe("Temporal Collab Spaces", () => {
 		const collabSpace = entry.collabSpace;
 		collabSpaces.push(collabSpace);
 		sendSomeOpCollection.push(() => {
-			entry.debug.sendSomeOp();
+			entry.debug.increment(1);
 		});
 
 		if (container.attachState !== AttachState.Detached) {
