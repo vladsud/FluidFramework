@@ -397,6 +397,8 @@ export class MockFluidDataStoreRuntime extends EventEmitter implements IFluidDat
     });
     // (undocumented)
     get absolutePath(): string;
+    // (undocumented)
+    addChannel(channel: IChannel): void;
     // @deprecated (undocumented)
     addedGCOutboundReference(srcHandle: IFluidHandle, outboundHandle: IFluidHandle): void;
     // (undocumented)
