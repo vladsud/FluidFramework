@@ -166,6 +166,9 @@ export function wrapContext(context: IFluidParentContext): IFluidParentContext {
 		deleteChildSummarizerNode: (...args) => {
 			return context.deleteChildSummarizerNode?.(...args);
 		},
+		setChannelDirty: (address: string) => {
+			return context.setChannelDirty(address);
+		},
 	};
 }
 
