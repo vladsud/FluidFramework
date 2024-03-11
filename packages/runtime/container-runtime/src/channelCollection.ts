@@ -321,7 +321,6 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 					}),
 					makeLocallyVisibleFn: () => this.makeDataStoreLocallyVisible(key),
 					snapshotTree,
-					isRootDataStore: undefined,
 				});
 			}
 			this.contexts.addBoundOrRemoted(dataStoreContext);
@@ -569,7 +568,6 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 			}),
 			makeLocallyVisibleFn: () => this.makeDataStoreLocallyVisible(id),
 			snapshotTree: undefined,
-			isRootDataStore: isRoot,
 		});
 		this.contexts.addUnbound(context);
 		return context;
@@ -588,7 +586,6 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 			}),
 			makeLocallyVisibleFn: () => this.makeDataStoreLocallyVisible(id),
 			snapshotTree: undefined,
-			isRootDataStore: false,
 			createProps: props,
 		});
 		this.contexts.addUnbound(context);
