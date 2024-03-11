@@ -2720,14 +2720,14 @@ export class ContainerRuntime
 		pkg: Readonly<string[]>,
 		loadingGroupId?: string,
 	): IFluidDataStoreContextDetached {
-		return this.channelCollection.createDetachedDataStoreCore(pkg, loadingGroupId);
+		return this.channelCollection.createDetachedDataStore(pkg, loadingGroupId);
 	}
 
 	public async createDataStore(
 		pkg: Readonly<string | string[]>,
 		loadingGroupId?: string,
 	): Promise<IDataStore> {
-		const context = this.channelCollection._createFluidDataStoreContext(
+		const context = this.channelCollection.createDataStoreContext(
 			Array.isArray(pkg) ? pkg : [pkg],
 			undefined, // props
 			loadingGroupId,
@@ -2747,7 +2747,7 @@ export class ContainerRuntime
 		pkg: Readonly<string | string[]>,
 		props?: any,
 	): Promise<IDataStore> {
-		const context = this.channelCollection._createFluidDataStoreContext(
+		const context = this.channelCollection.createDataStoreContext(
 			Array.isArray(pkg) ? pkg : [pkg],
 			props,
 		);
