@@ -22,11 +22,10 @@ export {
 	IFluidDataStoreContext,
 	IFluidParentContext,
 	IFluidDataStoreContextDetached,
-	IFluidDataStoreContextEvents,
 	VisibilityState,
 } from "./dataStoreContext";
 export { IFluidDataStoreFactory, IProvideFluidDataStoreFactory } from "./dataStoreFactory";
-export {
+export type {
 	FluidDataStoreRegistryEntry,
 	IFluidDataStoreRegistry,
 	IProvideFluidDataStoreRegistry,

@@ -127,5 +127,6 @@ export {
 	IFluidDataStoreContextProps,
 	ILocalFluidDataStoreContextProps,
 	ILocalDetachedFluidDataStoreContextProps,
+	IFluidDataStoreContextEvents,
 } from "./dataStoreContext";
 export { DataStoreContexts } from "./dataStoreContexts";
