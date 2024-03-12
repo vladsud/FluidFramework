@@ -108,6 +108,8 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
     protected createDataStoreId(): string;
     // (undocumented)
     createDetachedDataStoreCore(pkg: Readonly<string[]>): IFluidDataStoreContextDetached;
+    // (undocumented)
+    deleteChild(dataStoreId: string): void;
     deleteSweepReadyNodes(sweepReadyDataStoreRoutes: readonly string[]): readonly string[];
     // (undocumented)
     readonly dispose: () => void;
