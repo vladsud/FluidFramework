@@ -517,6 +517,7 @@ export abstract class FluidDataStoreContext extends TypedEventEmitter<IFluidData
     rollback(type: string, contents: any, localOpMetadata: unknown): void;
     // (undocumented)
     readonly scope: FluidObject;
+    // (undocumented)
     abstract setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
     setChannelDirty(address: string): void;
     setConnectionState(connected: boolean, clientId?: string): void;

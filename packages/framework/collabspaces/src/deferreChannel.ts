@@ -17,6 +17,7 @@ import { readAndParse } from "@fluidframework/driver-utils";
 import { FluidObject, IFluidHandle, IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { type ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
 import { FluidObjectHandle } from "@fluidframework/datastore";
+import { AttachState } from "@fluidframework/container-definitions";
 
 import { ICollabChannelFactory } from "./contracts";
 
@@ -122,6 +123,8 @@ export class DeferredChannel implements IFluidDataStoreChannel {
 	public async request(request: IRequest): Promise<IResponse> {
 		assert(false, "should not be called");
 	}
+
+	public setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void {}
 }
 
 /**
