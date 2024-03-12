@@ -1574,6 +1574,7 @@ export class ContainerRuntime
 				reSubmitBatch: this.reSubmitBatch.bind(this),
 				isActiveConnection: () => this.innerDeltaManager.active,
 				isAttached: () => this.attachState !== AttachState.Detached,
+				flush: () => this.flush(),
 			},
 			pendingRuntimeState?.pending,
 			this.logger,
@@ -2816,6 +2817,7 @@ export class ContainerRuntime
 				}
 				break;
 			}
+			case ContainerMessageType.IdAllocation:
 			case ContainerMessageType.GC: {
 				return false;
 			}

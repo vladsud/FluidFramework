@@ -49,6 +49,7 @@ export interface IRuntimeStateHandler {
 	reSubmitBatch(batch: IPendingBatchMessage[]): void;
 	isActiveConnection: () => boolean;
 	isAttached: () => boolean;
+	flush: () => void;
 }
 
 /** Union of keys of T */
@@ -416,6 +417,9 @@ export class PendingStateManager implements IDisposable {
 				});
 			}
 		}
+
+		// Work-around. need better solution.
+		this.stateHandler.flush();
 
 		// pending ops should no longer depend on previous sequenced local ops after resubmit
 		this.savedOps = [];
