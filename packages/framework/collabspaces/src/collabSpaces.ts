@@ -851,8 +851,19 @@ export class CollabSpacesRuntime
 	}
 
 	private destroyChannelCore(channelId: string) {
-		this.deleteChild(channelId);
+		// Force summarizer sub-system to summarize this object and get rid of deleted channel
+		this.parentContext.setChannelDirty(channelId);
+
+		// Is this safe? Anything else we need to do?
+		this.contexts.delete(channelId);
 		this.channelInfo[channelId] = undefined;
+
+		// TBD(Pri2): We need to update GC data and ensure that it's accurate.
+		// To some extend it's a noop event from GC perspective, and resulting data in the cell
+		// represents same data, but need to double check that it's actually correct and tests
+		// have proper coverage.
+
+		this.parentContext.deleteChildSummarizerNode?.(channelId);
 	}
 
 	// Saves or destroys channel, depending on the arguments
