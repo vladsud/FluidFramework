@@ -1092,7 +1092,7 @@ export class RemoteFluidDataStoreContext extends FluidDataStoreContext {
 		if (this.snapshotFetchRequired) {
 			assert(
 				this.loadingGroupId !== undefined,
-				"groupId should be present to fetch snapshot",
+				0x8f5 /* groupId should be present to fetch snapshot */,
 			);
 			const snapshot = await this.runtime.getSnapshotForLoadingGroupId(
 				[this.loadingGroupId],
@@ -1142,7 +1142,7 @@ export class RemoteFluidDataStoreContext extends FluidDataStoreContext {
 			}
 		}
 
-		assert(this.pkg !== undefined, "The datastore context package should be defined");
+		assert(this.pkg !== undefined, 0x8f6 /* The datastore context package should be defined */);
 		return {
 			pkg: this.pkg,
 			isRootDataStore,
@@ -1349,7 +1349,7 @@ export class LocalDetachedFluidDataStoreContext
 
 				assert(
 					!(await this.isRoot()),
-					"there are no more createRootDataStore() kind of APIs!",
+					0x8f7 /* there are no more createRootDataStore() kind of APIs! */,
 				);
 
 				return dataStoreChannel;

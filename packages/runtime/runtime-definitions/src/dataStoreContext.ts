@@ -505,7 +505,7 @@ export interface IFluidParentContext
 	): void;
 
 	/**
-	 * Call by IFluidDataStoreChannel, indicates that a channel is dirty and needs to be part of the summary.
+	 * Called by IFluidDataStoreChannel, indicates that a channel is dirty and needs to be part of the summary.
 	 * @param address - The address of the channel that is dirty.
 	 */
 	setChannelDirty(address: string): void;

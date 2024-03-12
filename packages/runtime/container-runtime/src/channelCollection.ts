@@ -702,7 +702,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 	}
 
 	public rollback(type: string, content: any, localOpMetadata: unknown) {
-		assert(type === ContainerMessageType.FluidDataStoreOp, "type");
+		assert(type === ContainerMessageType.FluidDataStoreOp, 0x8e8 /* type */);
 		const envelope = content as IEnvelope;
 		const context = this.contexts.get(envelope.address);
 		// If the data store has been deleted, log an error and throw an error. If there are local changes for a
@@ -791,7 +791,7 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 				break;
 			}
 			default:
-				assert(false, "unreached");
+				assert(false, 0x8e9 /* unreached */);
 		}
 	}
 
