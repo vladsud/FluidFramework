@@ -20,6 +20,7 @@ export {
 	DefaultSummaryConfiguration,
 	ICompressionRuntimeOptions,
 	CompressionAlgorithms,
+	RuntimeHeaderData,
 } from "./containerRuntime";
 export {
 	ContainerMessageType,
@@ -116,3 +117,15 @@ export {
 	 */
 	isStableId,
 } from "@fluidframework/id-compressor";
+export { ChannelCollection } from "./channelCollection";
+export {
+	IFluidDataStoreContextInternal,
+	ISnapshotDetails,
+	LocalFluidDataStoreContext,
+	LocalFluidDataStoreContextBase,
+	FluidDataStoreContext,
+	IFluidDataStoreContextProps,
+	ILocalFluidDataStoreContextProps,
+	ILocalDetachedFluidDataStoreContextProps,
+} from "./dataStoreContext";
+export { DataStoreContexts } from "./dataStoreContexts";
