@@ -180,7 +180,10 @@ describe("Temporal Collab Spaces", () => {
 	}
 
 	beforeEach("getTestObjectProvider", async () => {
-		const driver = new LocalServerTestDriver(undefined /* LocalDriverApiType */, 10000 /* maxOps */);
+		const driver = new LocalServerTestDriver(
+			undefined /* LocalDriverApiType */,
+			10000 /* maxOps */,
+		);
 		const registry = [];
 		seed = 1; // Every test is independent from another test!
 
