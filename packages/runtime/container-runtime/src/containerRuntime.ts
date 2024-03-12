@@ -1803,10 +1803,6 @@ export class ContainerRuntime
 		assert(false, "should not be called");
 	}
 
-	public setChannelDirty(address: string) {
-		assert(false, "should not be called");
-	}
-
 	/**
 	 * Initializes the state from the base snapshot this container runtime loaded from.
 	 */
