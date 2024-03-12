@@ -134,6 +134,8 @@ export class FluidDataStoreRuntime<TEvents = Record<string, never>> extends Type
     // (undocumented)
     protected setChannelDirty(address: string): void;
     // (undocumented)
+    setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
+    // (undocumented)
     setConnectionState(connected: boolean, clientId?: string): void;
     // (undocumented)
     protected readonly sharedObjectRegistry: ISharedObjectRegistry;

@@ -416,6 +416,7 @@ declare function get_old_InterfaceDeclaration_IFluidDataStoreChannel():
 declare function use_current_InterfaceDeclaration_IFluidDataStoreChannel(
     use: TypeOnly<current.IFluidDataStoreChannel>): void;
 use_current_InterfaceDeclaration_IFluidDataStoreChannel(
+    // @ts-expect-error compatibility expected to be broken
     get_old_InterfaceDeclaration_IFluidDataStoreChannel());
 
 /*
@@ -482,6 +483,18 @@ declare function use_old_InterfaceDeclaration_IFluidDataStoreContextDetached(
 use_old_InterfaceDeclaration_IFluidDataStoreContextDetached(
     // @ts-expect-error compatibility expected to be broken
     get_current_InterfaceDeclaration_IFluidDataStoreContextDetached());
+
+/*
+* Validate forward compat by using old type in place of current type
+* If breaking change required, add in package.json under typeValidation.broken:
+* "RemovedInterfaceDeclaration_IFluidDataStoreContextEvents": {"forwardCompat": false}
+*/
+
+/*
+* Validate back compat by using current type in place of old type
+* If breaking change required, add in package.json under typeValidation.broken:
+* "RemovedInterfaceDeclaration_IFluidDataStoreContextEvents": {"backCompat": false}
+*/
 
 /*
 * Validate forward compat by using old type in place of current type

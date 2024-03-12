@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { unreachableCase } from "@fluidframework/core-utils";
 import {
 	IDisposable,
 	FluidObject,
@@ -165,6 +166,7 @@ export interface IRemoteFluidDataStoreContextProps extends IFluidDataStoreContex
 }
 
 // back-compat: To be removed in the future.
+// Added in "2.0.0-rc.2.0.0" timeframe (to support older builds).
 /** @internal */
 export interface IFluidDataStoreContextEvents extends IEvent {
 	(event: "attaching" | "attached", listener: () => void);
@@ -412,32 +414,7 @@ export abstract class FluidDataStoreContext
 		this._tombstoned = tombstone;
 	}
 
-	public setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void {
-		switch (attachState) {
-			case AttachState.Attaching:
-				assert(
-					this.attachState === AttachState.Detached,
-					0x14d /* "Should move from detached to attaching" */,
-				);
-				this._attachState = AttachState.Attaching;
-				this.channel?.setAttachState?.(attachState);
-				// back-compat! To be removed in the future
-				// this.emit("attaching");
-				break;
-			case AttachState.Attached:
-				assert(
-					this.attachState === AttachState.Attaching,
-					0x14e /* "Should move from attaching to attached" */,
-				);
-				this._attachState = AttachState.Attached;
-				this.channel?.setAttachState?.(attachState);
-				// back-compat! To be removed in the future
-				// this.emit("attached");
-				break;
-			default:
-				unreachableCase(attachState, "unreached");
-		}
-	}
+	public abstract setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
 
 	private rejectDeferredRealize(
 		reason: string,
@@ -1086,6 +1063,18 @@ export class RemoteFluidDataStoreContext extends FluidDataStoreContext {
 		}
 	}
 
+	/* 
+	This API should not be called for RemoteFluidDataStoreContext. But here is one scenario where it's not the case:
+	The scenario (hit by stashedOps.spec.ts, "resends attach op" UT is the following (as far as I understand):
+	1. data store is being attached in attached container
+	2. container state is serialized (stashed ops feature)
+	3. new container instance is rehydrated (from stashed ops)
+	    - As result, we create RemoteFluidDataStoreContext for this data store that is actually in "attaching" state (as of # 2).
+		  But its state is set to attached when loading container from stashed ops
+	4. attach op for this data store is processed - setAttachState() is called.
+	*/
+	public setAttachState(attachState: AttachState.Attaching | AttachState.Attached) {}
+
 	private readonly initialSnapshotDetailsP = new LazyPromise<ISnapshotDetails>(async () => {
 		// Sequence number of the snapshot.
 		let sequenceNumber: number | undefined;
@@ -1190,6 +1179,50 @@ export class LocalFluidDataStoreContextBase extends FluidDataStoreContext {
 
 		this.snapshotTree = props.snapshotTree;
 		this.createProps = props.createProps;
+	}
+
+	public setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void {
+		switch (attachState) {
+			case AttachState.Attaching:
+				assert(
+					this.attachState === AttachState.Detached,
+					0x14d /* "Should move from detached to attaching" */,
+				);
+				this._attachState = AttachState.Attaching;
+				if (this.channel?.setAttachState) {
+					this.channel.setAttachState(attachState);
+				} else if (this.channel) {
+					// back-compat! To be removed in the future
+					// Added in "2.0.0-rc.2.0.0" timeframe.
+					this.emit("attaching");
+				}
+				break;
+			case AttachState.Attached:
+				// We can get called into here twice, as result of both container and data store being attached, if
+				// those processes overlapped, for example, in a flow like that one:
+				// 1. Container attach started
+				// 2. data store attachment started
+				// 3. container attached
+				// 4. data store attached.
+				if (this.attachState !== AttachState.Attached) {
+					assert(
+						this.attachState === AttachState.Attaching,
+						0x14e /* "Should move from attaching to attached" */,
+					);
+					this._attachState = AttachState.Attached;
+					this.channel?.setAttachState?.(attachState);
+					if (this.channel?.setAttachState) {
+						this.channel.setAttachState(attachState);
+					} else if (this.channel) {
+						// back-compat! To be removed in the future
+						// Added in "2.0.0-rc.2.0.0" timeframe.
+						this.emit("attached");
+					}
+				}
+				break;
+			default:
+				unreachableCase(attachState, "unreached");
+		}
 	}
 
 	/**
