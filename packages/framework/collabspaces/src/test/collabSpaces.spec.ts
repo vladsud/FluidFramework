@@ -180,7 +180,7 @@ describe("Temporal Collab Spaces", () => {
 	}
 
 	beforeEach("getTestObjectProvider", async () => {
-		const driver = new LocalServerTestDriver();
+		const driver = new LocalServerTestDriver(undefined /* LocalDriverApiType */, 10000 /* maxOps */);
 		const registry = [];
 		seed = 1; // Every test is independent from another test!
 
@@ -1280,6 +1280,10 @@ describe("Temporal Collab Spaces", () => {
 
 			// This operation does not really matter, what matters is that it creates a channel
 			// and we are forced to examine mapping at the end of the test
+			collabSpaces[1].setCell(15, 3, {
+				value: 100,
+				type: TestDataObject.Type,
+			});
 			await collabOnChannel(collabSpaces[1], 15, 3, 1);
 
 			// This operation is problematic. It gets rebased. Column insertion is rebased correctly,
