@@ -40,9 +40,6 @@ class MySharedObject extends SharedObject {
 	) {
 		throw new Error("Method not implemented.");
 	}
-	protected onDisconnect() {
-		throw new Error("Method not implemented.");
-	}
 	protected applyStashedOp(content: any): unknown {
 		throw new Error("Method not implemented.");
 	}
@@ -70,9 +67,6 @@ class MySharedObjectCore extends SharedObjectCore {
 		local: boolean,
 		localOpMetadata: unknown,
 	) {
-		throw new Error("Method not implemented.");
-	}
-	protected onDisconnect() {
 		throw new Error("Method not implemented.");
 	}
 	protected applyStashedOp(content: any): unknown {

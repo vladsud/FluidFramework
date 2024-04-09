@@ -622,18 +622,15 @@ export abstract class SharedSegmentSequence<T extends ISegment>
 		}
 	}
 
+	// TO BE FIXED
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onConnect}
 	 */
 	protected onConnect() {
+		this.dataStoreRuntime.connected
 		// Update merge tree collaboration information with new client ID and then resend pending ops
 		this.client.startOrUpdateCollaboration(this.runtime.clientId);
 	}
-
-	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect() {}
 
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.reSubmitCore}

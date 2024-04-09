@@ -428,11 +428,6 @@ export class PactMap<T = unknown> extends SharedObject<IPactMapEvents> implement
 	protected initializeLocalCore(): void {}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObjectCore.onDisconnect}
-	 */
-	protected onDisconnect(): void {}
-
-	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObjectCore.reSubmitCore}
 	 */
 	protected reSubmitCore(content: unknown, localOpMetadata: unknown): void {

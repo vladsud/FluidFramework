@@ -27,8 +27,6 @@ export class ConsensusRegisterCollection<T> extends SharedObject<IConsensusRegis
     keys(): string[];
     protected loadCore(storage: IChannelStorageService): Promise<void>;
     // (undocumented)
-    protected onDisconnect(): void;
-    // (undocumented)
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     read(key: string, readPolicy?: ReadPolicy): T | undefined;
     // (undocumented)

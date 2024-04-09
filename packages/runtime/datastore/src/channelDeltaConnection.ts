@@ -52,12 +52,8 @@ export class ChannelDeltaConnection implements IDeltaConnection {
 		assert(!!this._handler, 0x177 /* "Missing delta handler" */);
 		return this._handler;
 	}
-	public get connected(): boolean {
-		return this._connected;
-	}
 
 	constructor(
-		private _connected: boolean,
 		private readonly submitFn: (content: any, localOpMetadata: unknown) => void,
 		public readonly dirty: () => void,
 		/** @deprecated There is no replacement for this, its functionality is no longer needed at this layer. */
@@ -71,11 +67,6 @@ export class ChannelDeltaConnection implements IDeltaConnection {
 	public attach(handler: IDeltaHandler) {
 		assert(this._handler === undefined, 0x178 /* "Missing delta handler on attach" */);
 		this._handler = handler;
-	}
-
-	public setConnectionState(connected: boolean) {
-		this._connected = connected;
-		this.handler.setConnectionState(connected);
 	}
 
 	public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {

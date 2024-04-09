@@ -232,13 +232,6 @@ export class Ink extends SharedObject<IInkEvents> implements IInk {
 	}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect(): void {
-		return;
-	}
-
-	/**
 	 * Update the model for a clear operation.
 	 * @param operation - The operation object
 	 */

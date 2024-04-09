@@ -70,11 +70,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 	private readonly mc: MonitoringContext;
 
 	/**
-	 * Connection state
-	 */
-	private _connected = false;
-
-	/**
 	 * Services used by the shared object
 	 */
 	private services: IChannelServices | undefined;
@@ -88,14 +83,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 	 * Tracks error that closed this object.
 	 */
 	private closeError?: ReturnType<typeof DataProcessingError.wrapIfUnrecognized>;
-
-	/**
-	 * Gets the connection state
-	 * @returns The state of the connection
-	 */
-	public get connected(): boolean {
-		return this._connected;
-	}
 
 	/**
 	 * @param id - The id of the shared object
@@ -214,14 +201,11 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 
 	private setBoundAndHandleAttach() {
 		// Ensure didAttach is only called once, and we only register a single event
-		// but we still call setConnectionState as our existing mocks don't
-		// always propagate connection state
-		this.setBoundAndHandleAttach = () => this.setConnectionState(this.runtime.connected);
+		this.setBoundAndHandleAttach = () => {};
 		this._isBoundToContext = true;
 		const runDidAttach = () => {
 			// Allows objects to do any custom processing if it is attached.
 			this.didAttach();
-			this.setConnectionState(this.runtime.connected);
 		};
 		if (this.isAttached()) {
 			runDidAttach();
@@ -359,11 +343,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 	);
 
 	/**
-	 * Called when the object has disconnected from the delta stream.
-	 */
-	protected abstract onDisconnect();
-
-	/**
 	 * The serializer to serialize / parse handles.
 	 */
 	protected abstract get serializer(): IFluidSerializer;
@@ -399,12 +378,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		this.services!.deltaConnection.dirty();
 	}
-
-	/**
-	 * Called when the object has fully connected to the delta stream
-	 * Default implementation for DDS, override if different behavior is required.
-	 */
-	protected onConnect() {}
 
 	/**
 	 * Called when a message has to be resubmitted. This typically happens after a reconnection for unacked messages.
@@ -471,9 +444,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 					localOpMetadata,
 				);
 			},
-			setConnectionState: (connected: boolean) => {
-				this.setConnectionState(connected);
-			},
 			reSubmit: (content: any, localOpMetadata: unknown) => {
 				this.reSubmit(content, localOpMetadata);
 			},
@@ -484,36 +454,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
 				this.rollback(content, localOpMetadata);
 			},
 		});
-	}
-
-	/**
-	 * Set the state of connection to services.
-	 * @param connected - true if connected, false otherwise.
-	 */
-	private setConnectionState(connected: boolean) {
-		// only an attached shared object can transition its
-		// connected state. This is defensive, as some
-		// of our test harnesses don't handle this correctly
-		if (!this.isAttached() || this._connected === connected) {
-			// Not changing state, nothing the same.
-			return;
-		}
-
-		// Should I change the state at the end? So that we *can't* send new stuff before we send old?
-		this._connected = connected;
-
-		if (!connected) {
-			// Things that are true now...
-			// - if we had a connection we can no longer send messages over it
-			// - if we had outbound messages some may or may not be ACK'd. Won't know until next message
-			//
-			// - nack could get a new msn - but might as well do it in the join?
-			this.onDisconnect();
-		} else {
-			// Call this for now so that DDSes like ConsensusOrderedCollection that maintain their own pending
-			// messages will work.
-			this.onConnect();
-		}
 	}
 
 	/**

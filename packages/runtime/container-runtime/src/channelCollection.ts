@@ -998,29 +998,6 @@ export class ChannelCollection implements IFluidDataStoreChannel, IDisposable {
 		context.processSignal(message, local);
 	}
 
-	public setConnectionState(connected: boolean, clientId?: string) {
-		for (const [fluidDataStoreId, context] of this.contexts) {
-			try {
-				context.setConnectionState(connected, clientId);
-			} catch (error) {
-				this.mc.logger.sendErrorEvent(
-					{
-						eventName: "SetConnectionStateError",
-						clientId,
-						...tagCodeArtifacts({
-							fluidDataStoreId,
-						}),
-						details: JSON.stringify({
-							runtimeConnected: this.parentContext.connected,
-							connected,
-						}),
-					},
-					error,
-				);
-			}
-		}
-	}
-
 	public setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void {
 		for (const [, context] of this.contexts) {
 			// Fire only for bounded stores.

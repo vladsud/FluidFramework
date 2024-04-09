@@ -31,7 +31,6 @@ export class SharedSummaryBlock extends SharedObject implements ISharedSummaryBl
     get<T>(key: string): Jsonable<T>;
     static getFactory(): IChannelFactory;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean): void;
     set<T>(key: string, value: Jsonable<T>): void;
     protected summarizeCore(serializer: IFluidSerializer): ISummaryTreeWithStats;

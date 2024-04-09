@@ -62,21 +62,7 @@ const defaultBlobSize = 1024;
  */
 export class LoadTestDataStoreModel {
 	private static async waitForCatchup(runtime: IFluidDataStoreRuntime): Promise<void> {
-		if (!runtime.connected) {
-			await new Promise<void>((resolve, reject) => {
-				const connectListener = () => {
-					runtime.off("dispose", disposeListener);
-					resolve();
-				};
-				const disposeListener = () => {
-					runtime.off("connected", connectListener);
-					reject(new Error("disposed"));
-				};
-
-				runtime.once("connected", connectListener);
-				runtime.once("dispose", disposeListener);
-			});
-		}
+		await runtime.getAudience().waitConnected();
 		const lastKnownSeq = runtime.deltaManager.lastKnownSeqNumber;
 		assert(
 			runtime.deltaManager.lastSequenceNumber <= lastKnownSeq,
@@ -337,13 +323,8 @@ export class LoadTestDataStoreModel {
 	private deferUntilConnected(callback: () => void, errorHandler: (error) => void) {
 		Promise.resolve()
 			.then(() => {
-				if (this.runtime.connected) {
-					callback();
-				} else {
-					this.runtime.once("connected", () => {
-						callback();
-					});
-				}
+				await this.runtime.getAudience().waitConnected();
+				callback();
 			})
 			.catch((error) => errorHandler(error));
 	}

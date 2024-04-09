@@ -226,8 +226,6 @@ export class MockDeltaConnection implements IDeltaConnection {
     // (undocumented)
     reSubmit(content: any, localOpMetadata: unknown): void;
     // (undocumented)
-    setConnectionState(connected: boolean): void;
-    // (undocumented)
     submit(messageContent: any, localOpMetadata: unknown): number;
 }
 
@@ -527,8 +525,6 @@ export class MockFluidDataStoreRuntime extends EventEmitter implements IFluidDat
     save(message: string): void;
     // (undocumented)
     setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
-    // (undocumented)
-    setConnectionState(connected: boolean, clientId?: string): void;
     // (undocumented)
     submitMessage(type: MessageType, content: any): null;
     // (undocumented)

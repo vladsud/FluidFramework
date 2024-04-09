@@ -131,11 +131,6 @@ export class SharedCounter extends SharedObject<ISharedCounterEvents> implements
 	}
 
 	/**
-	 * Called when the object has disconnected from the delta stream.
-	 */
-	protected onDisconnect(): void {}
-
-	/**
 	 * Process a counter operation (op).
 	 *
 	 * @param message - The message to prepare.

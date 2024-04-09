@@ -124,8 +124,6 @@ export abstract class SharedObjectCore<TEvent extends ISharedObjectEvents = ISha
     protected abstract loadCore(services: IChannelStorageService): Promise<void>;
     protected readonly logger: ITelemetryLoggerExt;
     protected newAckBasedPromise<T>(executor: (resolve: (value: T | PromiseLike<T>) => void, reject: (reason?: any) => void) => void): Promise<T>;
-    protected onConnect(): void;
-    protected abstract onDisconnect(): any;
     protected abstract processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): any;
     protected reSubmitCore(content: any, localOpMetadata: unknown): void;
     protected rollback(content: any, localOpMetadata: unknown): void;

@@ -44,7 +44,6 @@ class SharedNothing extends SharedObject {
 		this.loadCoreCalls++;
 		this.methodCalls.push("loadCore");
 	}
-	protected onDisconnect(): void {}
 	protected applyStashedOp(): void {
 		this.noop();
 		this.applyStashedOpCalls++;

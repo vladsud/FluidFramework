@@ -213,6 +213,7 @@ export class SharedPropertyTree extends SharedObject {
 		return new PropertyTreeFactory();
 	}
 
+	// TO BE FIXED
 	/**
 	 * in case of partial checkout we want to send the paths we are interested in once we are connected
 	 */
@@ -778,8 +779,6 @@ export class SharedPropertyTree extends SharedObject {
 			this.root.cleanDirty();
 		}
 	}
-
-	protected onDisconnect() {}
 
 	private _applyLocalChangeSet(change: IPropertyTreeMessage) {
 		const changeSetWrapper = new ChangeSet(this.tipView);

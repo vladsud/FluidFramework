@@ -923,7 +923,6 @@ export class SharedTree extends SharedObject<ISharedTreeEvents> implements NodeI
     readonly logger: ITelemetryLoggerExt;
     get logViewer(): LogViewer;
     mergeEditsFrom(other: SharedTree, edits: Iterable<Edit<InternalizedChange>>, stableIdRemapper?: (id: StableNodeId) => StableNodeId): EditId[];
-    protected onDisconnect(): void;
     protected processCore(message: unknown, local: boolean): void;
     protected registerCore(): void;
     // (undocumented)

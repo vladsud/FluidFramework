@@ -279,6 +279,7 @@ export class ConsensusOrderedCollection<T = any>
 		this.data.loadFrom(content2);
 	}
 
+	// TO BE FIXED
 	protected onDisconnect() {
 		for (const [, { value, clientId }] of this.jobTracking) {
 			if (clientId === this.runtime.clientId) {

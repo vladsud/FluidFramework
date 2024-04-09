@@ -38,7 +38,6 @@ export class AttributableMap extends SharedObject<ISharedMapEvents> implements I
     has(key: string): boolean;
     keys(): IterableIterator<string>;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected reSubmitCore(content: unknown, localOpMetadata: unknown): void;
     protected rollback(content: unknown, localOpMetadata: unknown): void;

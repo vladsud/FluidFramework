@@ -618,6 +618,7 @@ export class TaskManager extends SharedObject<ITaskManagerEvents> implements ITa
 	/***/
 	protected initializeLocalCore() {}
 
+	// TO BE FIXED
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
 	 */
@@ -625,6 +626,7 @@ export class TaskManager extends SharedObject<ITaskManagerEvents> implements ITa
 		this.connectionWatcher.emit("disconnect");
 	}
 
+	// TO BE FIXED
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onConnect}
 	 */

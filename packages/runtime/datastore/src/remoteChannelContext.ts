@@ -112,9 +112,6 @@ export class RemoteChannelContext implements IChannelContext {
 			this.pending = undefined;
 			this.isLoaded = true;
 
-			// Because have some await between we created the service and here, the connection state might have changed
-			// and we don't propagate the connection state when we are not loaded.  So we have to set it again here.
-			this.services.deltaConnection.setConnectionState(dataStoreContext.connected);
 			return this.channel;
 		});
 
@@ -145,15 +142,6 @@ export class RemoteChannelContext implements IChannelContext {
 	// eslint-disable-next-line @typescript-eslint/promise-function-async
 	public getChannel(): Promise<IChannel> {
 		return this.channelP;
-	}
-
-	public setConnectionState(connected: boolean, clientId?: string) {
-		// Connection events are ignored if the data store is not yet loaded
-		if (!this.isLoaded) {
-			return;
-		}
-
-		this.services.deltaConnection.setConnectionState(connected);
 	}
 
 	public applyStashedOp(content: any): unknown {

@@ -98,8 +98,6 @@ export abstract class SharedOT<TState, TOp> extends SharedObject {
 		this.global = this.local = this.serializer.parse(rawContent);
 	}
 
-	protected onDisconnect() {}
-
 	protected processCore(message: ISequencedDocumentMessage, local: boolean) {
 		// Discard any sequenced ops that are now below the minimum sequence number.
 		const minSeq = this.runtime.deltaManager.minimumSequenceNumber;

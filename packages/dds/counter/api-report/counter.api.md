@@ -35,7 +35,6 @@ export class SharedCounter extends SharedObject<ISharedCounterEvents> implements
     static getFactory(): IChannelFactory<ISharedCounter>;
     increment(incrementAmount: number): void;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected summarizeCore(serializer: IFluidSerializer): ISummaryTreeWithStats;
     get value(): number;

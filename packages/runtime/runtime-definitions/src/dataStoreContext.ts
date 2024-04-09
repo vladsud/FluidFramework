@@ -333,14 +333,6 @@ export interface IFluidDataStoreChannel extends IDisposable {
 	updateUsedRoutes(usedRoutes: string[]): void;
 
 	/**
-	 * Notifies this object about changes in the connection state.
-	 * @param value - New connection state.
-	 * @param clientId - ID of the client. It's old ID when in disconnected state and
-	 * it's new client ID when we are connecting or connected.
-	 */
-	setConnectionState(connected: boolean, clientId?: string);
-
-	/**
 	 * Ask the DDS to resubmit a message. This could be because we reconnected and this message was not acked.
 	 * @param type - The type of the original message.
 	 * @param content - The content of the original message.

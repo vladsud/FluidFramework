@@ -55,7 +55,6 @@ export class TaskManager extends SharedObject<ITaskManagerEvents> implements ITa
     protected initializeLocalCore(): void;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
     protected onConnect(): void;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     queued(taskId: string): boolean;
     protected reSubmitCore(): void;

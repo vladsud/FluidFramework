@@ -645,11 +645,6 @@ export class SharedDirectory
 	}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect(): void {}
-
-	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.reSubmitCore}
 	 */
 	protected reSubmitCore(content: unknown, localOpMetadata: unknown): void {

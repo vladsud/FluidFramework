@@ -384,7 +384,6 @@ export interface IGarbageCollector {
 	processMessage(message: ContainerRuntimeGCMessage, local: boolean): void;
 	/** Returns true if this node has been deleted by GC during sweep phase. */
 	isNodeDeleted(nodePath: string): boolean;
-	setConnectionState(connected: boolean, clientId?: string): void;
 	dispose(): void;
 }
 

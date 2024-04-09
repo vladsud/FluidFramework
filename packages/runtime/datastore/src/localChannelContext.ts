@@ -59,13 +59,6 @@ export abstract class LocalChannelContextBase implements IChannelContext {
 		return this._channel !== undefined;
 	}
 
-	public setConnectionState(connected: boolean, clientId?: string) {
-		// Connection events are ignored if the data store is not yet globallyVisible or loaded
-		if (this.globallyVisible && this.isLoaded) {
-			this.services.value.deltaConnection.setConnectionState(connected);
-		}
-	}
-
 	public processOp(
 		message: ISequencedDocumentMessage,
 		local: boolean,

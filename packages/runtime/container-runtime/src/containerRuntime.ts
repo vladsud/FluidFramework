@@ -2515,9 +2515,7 @@ export class ContainerRuntime
 			this.replayPendingStates();
 		}
 
-		this.channelCollection.setConnectionState(connected, clientId);
 		this.garbageCollector.setConnectionState(connected, clientId);
-
 		raiseConnectedEvent(this.mc.logger, this, connected, clientId);
 	}
 

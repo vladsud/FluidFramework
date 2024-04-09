@@ -69,9 +69,6 @@ export class MockContainerRuntimeForReconnection extends MockContainerRuntime {
 			}
 			this.outbox.length = 0;
 		}
-
-		// Let the DDSes know that the connection state changed.
-		this.dataStoreRuntime.setConnectionState(this.connected, this.clientId);
 	}
 
 	private _connected = true;

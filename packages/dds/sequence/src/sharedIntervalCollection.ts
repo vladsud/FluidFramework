@@ -145,8 +145,6 @@ export class SharedIntervalCollection
 		);
 	}
 
-	protected onDisconnect() {}
-
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.loadCore}
 	 */

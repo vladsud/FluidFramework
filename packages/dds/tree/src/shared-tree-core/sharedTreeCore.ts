@@ -282,8 +282,6 @@ export class SharedTreeCore<TEditor extends ChangeFamilyEditor, TChange> extends
 		return this.editManager.localBranch;
 	}
 
-	protected onDisconnect() {}
-
 	protected override didAttach(): void {
 		if (this.detachedRevision !== undefined) {
 			this.detachedRevision = undefined;

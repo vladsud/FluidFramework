@@ -532,8 +532,6 @@ export class SharedIntervalCollection extends SharedObject implements ISharedInt
     protected getIntervalCollectionPath(label: string): string;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
     // (undocumented)
-    protected onDisconnect(): void;
-    // (undocumented)
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     // (undocumented)
     protected reSubmitCore(content: any, localOpMetadata: unknown): void;
@@ -598,7 +596,6 @@ export abstract class SharedSegmentSequence<T extends ISegment> extends SharedOb
     localReferencePositionToPosition(lref: ReferencePosition): number;
     obliterateRange(start: number, end: number): void;
     protected onConnect(): void;
-    protected onDisconnect(): void;
     posFromRelativePos(relativePos: IRelativePosition): number;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected processGCDataCore(serializer: IFluidSerializer): void;

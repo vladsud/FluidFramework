@@ -212,9 +212,6 @@ export class SharedPropertyTree extends SharedObject {
     protected logIfEnabled(message: any): void;
     // (undocumented)
     notificationDelayScope: number;
-    protected onConnect(): void;
-    // (undocumented)
-    protected onDisconnect(): void;
     // (undocumented)
     options: SharedPropertyTreeOptions;
     popNotificationDelayScope(): void;

@@ -62,11 +62,6 @@ export class SharedTreeShimDeltaHandler implements IShimDeltaHandler {
 		return this.handler.process(message, local, localOpMetadata);
 	}
 
-	// No idea whether any of the below 4 methods work as expected
-	public setConnectionState(connected: boolean): void {
-		return this.handler.setConnectionState(connected);
-	}
-
 	// Resubmitting v1 ops should fail. We should not be resubmitting v1 ops.
 	public reSubmit(contents: unknown, localOpMetadata: unknown): void {
 		assert(

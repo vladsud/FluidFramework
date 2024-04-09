@@ -645,17 +645,6 @@ export class SharedMatrix<T = any>
 		}
 	}
 
-	protected onConnect() {
-		assert(
-			this.rows.getCollabWindow().collaborating === this.cols.getCollabWindow().collaborating,
-			0x01f /* "Row and col collab window 'collaborating' status desynchronized!" */,
-		);
-
-		// Update merge tree collaboration information with new client ID and then resend pending ops
-		this.rows.startOrUpdateCollaboration(this.runtime.clientId as string);
-		this.cols.startOrUpdateCollaboration(this.runtime.clientId as string);
-	}
-
 	private rebasePosition(
 		// eslint-disable-next-line import/no-deprecated
 		client: Client,
@@ -742,8 +731,6 @@ export class SharedMatrix<T = any>
 			}
 		}
 	}
-
-	protected onDisconnect() {}
 
 	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.loadCore}

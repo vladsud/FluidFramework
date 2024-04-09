@@ -193,7 +193,6 @@ export interface IFluidDataStoreChannel extends IDisposable {
     rollback?(type: string, content: any, localOpMetadata: unknown): void;
     // (undocumented)
     setAttachState(attachState: AttachState.Attaching | AttachState.Attached): void;
-    setConnectionState(connected: boolean, clientId?: string): any;
     summarize(fullTree?: boolean, trackState?: boolean, telemetryContext?: ITelemetryContext): Promise<ISummaryTreeWithStats>;
     updateUsedRoutes(usedRoutes: string[]): void;
 }

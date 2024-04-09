@@ -66,7 +66,6 @@ function createTestSharedObject(
 			local: boolean,
 			localOpMetadata: unknown,
 		) => void;
-		onDisconnect: (this: SharedObject) => void;
 		applyStashedOp: (this: SharedObject, content: any) => unknown;
 		didAttach: () => void;
 	}>,
@@ -75,7 +74,6 @@ function createTestSharedObject(
 		protected summarizeCore = overrides?.summarizeCore?.bind(this);
 		protected loadCore = overrides?.loadCore?.bind(this);
 		protected processCore = overrides?.processCore?.bind(this);
-		protected onDisconnect = overrides?.onDisconnect?.bind(this);
 		protected applyStashedOp = overrides?.applyStashedOp?.bind(this);
 		protected didAttach =
 			overrides.didAttach?.bind(this) ?? (() => assert.fail("didAttach not set"));

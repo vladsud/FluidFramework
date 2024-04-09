@@ -23,8 +23,6 @@ export abstract class SharedOT<TState, TOp> extends SharedObject {
     // (undocumented)
     protected loadCore(storage: IChannelStorageService): Promise<void>;
     // (undocumented)
-    protected onDisconnect(): void;
-    // (undocumented)
     protected processCore(message: ISequencedDocumentMessage, local: boolean): void;
     // (undocumented)
     protected get state(): TState;

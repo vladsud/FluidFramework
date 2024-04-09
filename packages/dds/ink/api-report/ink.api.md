@@ -86,7 +86,6 @@ export class Ink extends SharedObject<IInkEvents> implements IInk {
     getStroke(key: string): IInkStroke;
     getStrokes(): IInkStroke[];
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected summarizeCore(serializer: IFluidSerializer): ISummaryTreeWithStats;
 }

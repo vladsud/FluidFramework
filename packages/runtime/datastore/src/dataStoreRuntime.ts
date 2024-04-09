@@ -600,14 +600,9 @@ export class FluidDataStoreRuntime
 		this.pendingHandlesToMakeVisible.add(handle);
 	}
 
+	// back-compat: To be removed in 2.0.
+	// Left here for N/N-1 compat with container runtime.
 	public setConnectionState(connected: boolean, clientId?: string) {
-		this.verifyNotClosed();
-
-		for (const [, object] of this.contexts) {
-			object.setConnectionState(connected, clientId);
-		}
-
-		raiseConnectedEvent(this.logger, this, connected, clientId);
 	}
 
 	public getQuorum(): IQuorumClients {

@@ -132,12 +132,6 @@ export interface IDeltaHandler {
 	process: (message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) => void;
 
 	/**
-	 * State change events to indicate changes to the delta connection
-	 * @param connected - true if connected, false otherwise
-	 */
-	setConnectionState(connected: boolean): void;
-
-	/**
 	 * Called when the runtime asks the client to resubmit an op. This may be because the Container reconnected and
 	 * this op was not acked.
 	 * The client can choose to resubmit the same message, submit different / multiple messages or not submit anything

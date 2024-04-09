@@ -260,11 +260,6 @@ export class SharedMap extends SharedObject<ISharedMapEvents> implements IShared
 	}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect(): void {}
-
-	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.reSubmitCore}
 	 */
 	protected reSubmitCore(content: unknown, localOpMetadata: unknown): void {

@@ -88,10 +88,6 @@ export class SharedMatrix<T = any> extends SharedObject<ISharedMatrixEvents<T> &
     // (undocumented)
     get matrixProducer(): IMatrixProducer<MatrixItem<T>>;
     // (undocumented)
-    protected onConnect(): void;
-    // (undocumented)
-    protected onDisconnect(): void;
-    // (undocumented)
     openMatrix(consumer: IMatrixConsumer<MatrixItem<T>>): IMatrixReader<MatrixItem<T>>;
     openUndo(consumer: IUndoConsumer): void;
     // (undocumented)

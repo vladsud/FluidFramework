@@ -50,7 +50,6 @@ export class PactMap<T = unknown> extends SharedObject<IPactMapEvents> implement
     protected initializeLocalCore(): void;
     isPending(key: string): boolean;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected reSubmitCore(content: unknown, localOpMetadata: unknown): void;
     set(key: string, value: T | undefined): void;

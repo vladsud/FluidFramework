@@ -100,10 +100,6 @@ export class MigrationShimDeltaHandler implements IShimDeltaHandler {
 		return this.treeDeltaHandler.process(message, local, localOpMetadata);
 	}
 
-	public setConnectionState(connected: boolean): void {
-		return this.treeDeltaHandler.setConnectionState(connected);
-	}
-
 	public reSubmit(contents: unknown, localOpMetadata: unknown): void {
 		const opContents = contents as IOpContents;
 		if (this.isInV1StateAndIsBarrierOp(opContents)) {

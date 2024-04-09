@@ -36,8 +36,6 @@ export const attributesBlobKey = ".attributes";
 export interface IChannelContext {
 	getChannel(): Promise<IChannel>;
 
-	setConnectionState(connected: boolean, clientId?: string);
-
 	processOp(message: ISequencedDocumentMessage, local: boolean, localOpMetadata?: unknown): void;
 
 	summarize(
@@ -85,7 +83,6 @@ export function createChannelServiceEndpoints(
 	extraBlobs?: Map<string, ArrayBufferLike>,
 ): ChannelServiceEndpoints {
 	const deltaConnection = new ChannelDeltaConnection(
-		connected,
 		(message, localOpMetadata) => submitFn(message, localOpMetadata),
 		dirtyFn,
 		addedGCOutboundReferenceFn,

@@ -29,10 +29,6 @@ export class PreMigrationDeltaConnection implements IDeltaConnection {
 		private readonly shimDeltaHandler: IShimDeltaHandler
 	) {}
 
-	public get connected(): boolean {
-		return this.deltaConnection.connected;
-	}
-
 	private canSubmit = true;
 	public disableSubmit(): void {
 		this.canSubmit = false;
@@ -84,10 +80,6 @@ export class StampDeltaConnection implements IDeltaConnection {
 		private readonly shimDeltaHandler: IShimDeltaHandler,
 		private readonly attributes: IChannelAttributes
 	) {}
-
-	public get connected(): boolean {
-		return this.deltaConnection.connected;
-	}
 
 	// This is for submitting v2 ops
 	public submit(messageContent: IUnstampedContents, localOpMetadata: unknown): void {

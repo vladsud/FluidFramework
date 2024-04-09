@@ -524,27 +524,6 @@ export abstract class FluidDataStoreContext
 		return channel;
 	}
 
-	/**
-	 * Notifies this object about changes in the connection state.
-	 * @param value - New connection state.
-	 * @param clientId - ID of the client. Its old ID when in disconnected state and
-	 * its new client ID when we are connecting or connected.
-	 */
-	public setConnectionState(connected: boolean, clientId?: string) {
-		// ConnectionState should not fail in tombstone mode as this is internally run
-		this.verifyNotClosed("setConnectionState", false /* checkTombstone */);
-
-		// Connection events are ignored if the store is not yet loaded
-		if (!this.loaded) {
-			return;
-		}
-
-		assert(this.connected === connected, 0x141 /* "Unexpected connected state" */);
-
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-		this.channel!.setConnectionState(connected, clientId);
-	}
-
 	public process(
 		message: ISequencedDocumentMessage,
 		local: boolean,
@@ -854,12 +833,6 @@ export abstract class FluidDataStoreContext
 		// And now mark the runtime active
 		this.loaded = true;
 		this.channel = channel;
-
-		// Channel does not know when it's "live" (as in - starts to receive events in the system)
-		// It may read current state of the system when channel was created, but it was not getting any updates
-		// through creation process and could have missed events. So update it on current state.
-		// Once this.loaded is set (above), it will stat receiving events.
-		channel.setConnectionState(this.connected, this.clientId);
 
 		// Freeze the package path to ensure that someone doesn't modify it when it is
 		// returned in packagePath().

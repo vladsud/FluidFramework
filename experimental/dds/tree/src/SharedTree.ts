@@ -1050,13 +1050,6 @@ export class SharedTree extends SharedObject<ISharedTreeEvents> implements NodeI
 	}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect(): void {
-		// Do nothing
-	}
-
-	/**
 	 * Parses a sequenced edit. This is only invoked for ops with version matching the current `writeFormat`.
 	 */
 	private parseSequencedEdit(op: SharedTreeEditOp | SharedTreeEditOp_0_0_2): Edit<ChangeInternal> {

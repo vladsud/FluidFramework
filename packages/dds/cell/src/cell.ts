@@ -234,11 +234,6 @@ export class SharedCell<T = any>
 	}
 
 	/**
-	 * Call back on disconnect.
-	 */
-	protected onDisconnect(): void {}
-
-	/**
 	 * Apply inner op.
 	 *
 	 * @param content - ICellOperation content

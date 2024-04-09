@@ -56,11 +56,6 @@ import { MockHandle } from "./mockHandle.js";
  * @alpha
  */
 export class MockDeltaConnection implements IDeltaConnection {
-	public get connected(): boolean {
-		return this._connected;
-	}
-
-	private _connected = true;
 	public handler: IDeltaHandler | undefined;
 
 	constructor(
@@ -70,7 +65,6 @@ export class MockDeltaConnection implements IDeltaConnection {
 
 	public attach(handler: IDeltaHandler): void {
 		this.handler = handler;
-		handler.setConnectionState(this.connected);
 	}
 
 	public submit(messageContent: any, localOpMetadata: unknown): number {
@@ -79,11 +73,6 @@ export class MockDeltaConnection implements IDeltaConnection {
 
 	public dirty(): void {
 		this.dirtyFn();
-	}
-
-	public setConnectionState(connected: boolean) {
-		this._connected = connected;
-		this.handler?.setConnectionState(connected);
 	}
 
 	public process(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown) {
@@ -897,14 +886,6 @@ export class MockFluidDataStoreRuntime
 		return;
 	}
 
-	public setConnectionState(connected: boolean, clientId?: string) {
-		if (connected && clientId !== undefined) {
-			this.clientId = clientId;
-		}
-		this.deltaConnections.forEach((dc) => dc.setConnectionState(connected));
-		return;
-	}
-
 	public async resolveHandle(request: IRequest): Promise<IResponse> {
 		if (request.url !== undefined) {
 			return {
@@ -1020,8 +1001,6 @@ export class MockFluidDataStoreRuntime
  * @internal
  */
 export class MockEmptyDeltaConnection implements IDeltaConnection {
-	public connected = false;
-
 	public attach(handler) {}
 
 	public submit(messageContent: any): number {

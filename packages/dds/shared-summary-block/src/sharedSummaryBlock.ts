@@ -113,11 +113,6 @@ export class SharedSummaryBlock extends SharedObject implements ISharedSummaryBl
 	}
 
 	/**
-	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.onDisconnect}
-	 */
-	protected onDisconnect() {}
-
-	/**
 	 * {@inheritDoc @fluidframework/shared-object-base#SharedObject.processCore}
 	 */
 	protected processCore(message: ISequencedDocumentMessage, local: boolean) {

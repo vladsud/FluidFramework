@@ -64,6 +64,7 @@ export class Bubblebench extends DataObject {
 			}, 1000);
 		};
 
+		// TO BE FIXED
 		// Wait for connection to begin checking client Id.
 		if (this.runtime.connected) {
 			onConnected();

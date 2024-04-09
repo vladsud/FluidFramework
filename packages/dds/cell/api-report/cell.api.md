@@ -71,7 +71,6 @@ export class SharedCell<T = any> extends SharedObject<ISharedCellEvents<T>> impl
     static getFactory(): IChannelFactory;
     protected initializeLocalCore(): void;
     protected loadCore(storage: IChannelStorageService): Promise<void>;
-    protected onDisconnect(): void;
     protected processCore(message: ISequencedDocumentMessage, local: boolean, localOpMetadata: unknown): void;
     protected rollback(content: any, localOpMetadata: unknown): void;
     set(value: Serializable<T>): void;
