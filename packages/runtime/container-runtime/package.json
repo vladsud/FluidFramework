@@ -247,9 +247,6 @@
 				"backCompat": false,
 				"forwardCompat": false
 			},
-			"InterfaceDeclaration_ISubmitSummaryOptions": {
-				"forwardCompat": false
-			},
 			"InterfaceDeclaration_IContainerRuntimeOptions": {
 				"forwardCompat": false,
 				"backCompat": false

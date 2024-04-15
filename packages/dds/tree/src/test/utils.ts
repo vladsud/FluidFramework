@@ -1121,6 +1121,11 @@ export class MockIdCompressor implements IIdCompressor, IIdCompressorCore {
 	public generateCompressedId(): SessionSpaceCompressedId {
 		return this.count++ as SessionSpaceCompressedId;
 	}
+
+	public generateDocumentUniqueId(): (SessionSpaceCompressedId & OpSpaceCompressedId) | StableId {
+		throw new Error("Method not implemented.");
+	}
+
 	public normalizeToOpSpace(id: SessionSpaceCompressedId): OpSpaceCompressedId {
 		return id as unknown as OpSpaceCompressedId;
 	}

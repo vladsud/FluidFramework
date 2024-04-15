@@ -47,6 +47,8 @@ export class IdCompressor implements IIdCompressor, IIdCompressorCore {
     // (undocumented)
     generateCompressedId(): SessionSpaceCompressedId;
     // (undocumented)
+    generateDocumentUniqueId(): (SessionSpaceCompressedId & OpSpaceCompressedId) | StableId;
+    // (undocumented)
     readonly localSessionId: SessionId;
     static readonly maxClusterSize: number;
     // (undocumented)
@@ -81,6 +83,7 @@ export interface IdCreationRange {
 export interface IIdCompressor {
     decompress(id: SessionSpaceCompressedId): StableId;
     generateCompressedId(): SessionSpaceCompressedId;
+    generateDocumentUniqueId(): (SessionSpaceCompressedId & OpSpaceCompressedId) | StableId;
     // (undocumented)
     localSessionId: SessionId;
     normalizeToOpSpace(id: SessionSpaceCompressedId): OpSpaceCompressedId;
