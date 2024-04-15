@@ -8123,7 +8123,6 @@ importers:
       '@arethetypeswrong/cli': ^0.13.3
       '@fluid-internal/client-utils': workspace:~
       '@fluid-tools/build-cli': ^0.29.0
-      '@fluidframework/aqueduct-previous': npm:@fluidframework/aqueduct@2.0.0-internal.8.0.0
       '@fluidframework/build-common': ^2.0.3
       '@fluidframework/build-tools': ^0.29.0
       '@fluidframework/container-definitions': workspace:~
@@ -8177,7 +8176,6 @@ importers:
     devDependencies:
       '@arethetypeswrong/cli': 0.13.3
       '@fluid-tools/build-cli': 0.29.0_mhw3tufvtaceew37hrkkevjcli
-      '@fluidframework/aqueduct-previous': /@fluidframework/aqueduct/2.0.0-internal.8.0.0
       '@fluidframework/build-common': 2.0.3
       '@fluidframework/build-tools': 0.29.0_@types+node@18.19.1
       '@fluidframework/eslint-config-fluid': 3.2.0_loebgezstcsvd2poh2d55fifke
@@ -8337,6 +8335,101 @@ importers:
       sinon: 7.5.0
       tsc-multi: 1.1.0_bwju7gmfuwum2ryv7w6vqpkpiy_typescript@5.1.6
       tslib: 1.14.1
+      typescript: 5.1.6
+
+  packages/framework/collabspaces:
+    specifiers:
+      '@arethetypeswrong/cli': ^0.13.3
+      '@fluid-internal/client-utils': workspace:~
+      '@fluid-private/test-drivers': workspace:~
+      '@fluid-tools/build-cli': ^0.29.0
+      '@fluidframework/aqueduct': workspace:~
+      '@fluidframework/build-common': ^2.0.3
+      '@fluidframework/build-tools': ^0.29.0
+      '@fluidframework/container-definitions': workspace:~
+      '@fluidframework/container-loader': workspace:~
+      '@fluidframework/container-runtime': workspace:~
+      '@fluidframework/container-runtime-definitions': workspace:~
+      '@fluidframework/core-interfaces': workspace:~
+      '@fluidframework/core-utils': workspace:~
+      '@fluidframework/counter': workspace:~
+      '@fluidframework/datastore': workspace:~
+      '@fluidframework/datastore-definitions': workspace:~
+      '@fluidframework/driver-utils': workspace:~
+      '@fluidframework/eslint-config-fluid': ^3.2.0
+      '@fluidframework/matrix': workspace:~
+      '@fluidframework/mocha-test-setup': workspace:~
+      '@fluidframework/protocol-definitions': ^3.1.0
+      '@fluidframework/runtime-definitions': workspace:~
+      '@fluidframework/runtime-utils': workspace:~
+      '@fluidframework/shared-object-base': workspace:~
+      '@fluidframework/telemetry-utils': workspace:~
+      '@fluidframework/test-utils': workspace:~
+      '@microsoft/api-extractor': ^7.38.3
+      '@tiny-calc/nano': 0.0.0-alpha.5
+      '@types/mocha': ^9.1.1
+      '@types/node': ^18.19.0
+      '@types/uuid': ^9.0.2
+      c8: ^8.0.1
+      copyfiles: ^2.4.1
+      cross-env: ^7.0.3
+      eslint: ~8.50.0
+      lz4js: ^0.2.0
+      mocha: ^10.2.0
+      mocha-json-output-reporter: ^2.0.1
+      mocha-multi-reporters: ^1.5.1
+      moment: ^2.21.0
+      prettier: ~3.0.3
+      rimraf: ^4.4.0
+      tsc-multi: ^1.1.0
+      typescript: ~5.1.6
+      uuid: ^9.0.0
+    dependencies:
+      '@fluid-internal/client-utils': link:../../common/client-utils
+      '@fluidframework/container-definitions': link:../../common/container-definitions
+      '@fluidframework/container-runtime': link:../../runtime/container-runtime
+      '@fluidframework/container-runtime-definitions': link:../../runtime/container-runtime-definitions
+      '@fluidframework/core-interfaces': link:../../common/core-interfaces
+      '@fluidframework/core-utils': link:../../common/core-utils
+      '@fluidframework/datastore': link:../../runtime/datastore
+      '@fluidframework/datastore-definitions': link:../../runtime/datastore-definitions
+      '@fluidframework/driver-utils': link:../../loader/driver-utils
+      '@fluidframework/matrix': link:../../dds/matrix
+      '@fluidframework/protocol-definitions': 3.1.0
+      '@fluidframework/runtime-definitions': link:../../runtime/runtime-definitions
+      '@fluidframework/runtime-utils': link:../../runtime/runtime-utils
+      '@fluidframework/shared-object-base': link:../../dds/shared-object-base
+      '@fluidframework/telemetry-utils': link:../../utils/telemetry-utils
+      '@tiny-calc/nano': 0.0.0-alpha.5
+      lz4js: 0.2.0
+      uuid: 9.0.1
+    devDependencies:
+      '@arethetypeswrong/cli': 0.13.3
+      '@fluid-private/test-drivers': link:../../test/test-drivers
+      '@fluid-tools/build-cli': 0.29.0_mhw3tufvtaceew37hrkkevjcli
+      '@fluidframework/aqueduct': link:../aqueduct
+      '@fluidframework/build-common': 2.0.3
+      '@fluidframework/build-tools': 0.29.0_@types+node@18.19.1
+      '@fluidframework/container-loader': link:../../loader/container-loader
+      '@fluidframework/counter': link:../../dds/counter
+      '@fluidframework/eslint-config-fluid': 3.2.0_loebgezstcsvd2poh2d55fifke
+      '@fluidframework/mocha-test-setup': link:../../test/mocha-test-setup
+      '@fluidframework/test-utils': link:../../test/test-utils
+      '@microsoft/api-extractor': 7.38.3_veevzrg6trzjzkr6gaha4thdmm_@types+node@18.19.1
+      '@types/mocha': 9.1.1
+      '@types/node': 18.19.1
+      '@types/uuid': 9.0.7
+      c8: 8.0.1
+      copyfiles: 2.4.1
+      cross-env: 7.0.3
+      eslint: 8.50.0
+      mocha: 10.2.0
+      mocha-json-output-reporter: 2.1.0_mocha@10.2.0+moment@2.29.4
+      mocha-multi-reporters: 1.5.1_mocha@10.2.0
+      moment: 2.29.4
+      prettier: 3.0.3
+      rimraf: 4.4.1
+      tsc-multi: 1.1.0_bwju7gmfuwum2ryv7w6vqpkpiy_typescript@5.1.6
       typescript: 5.1.6
 
   packages/framework/data-object-base:
