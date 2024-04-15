@@ -31,7 +31,8 @@ import { createContainerRuntimeFactoryWithDefaultDataStore } from "./testContain
 
 const summarizerClientType = "summarizer";
 
-async function createSummarizerCore(
+/** @internal */
+export async function createSummarizerCore(
 	container: IContainer,
 	loader: IHostLoader,
 	summaryVersion?: string,

@@ -244,7 +244,8 @@
 	"typeValidation": {
 		"broken": {
 			"ClassDeclaration_ContainerRuntime": {
-				"forwardCompat": false
+				"forwardCompat": false,
+				"backCompat": false
 			}
 		}
 	}

@@ -14,9 +14,6 @@ export {
 	RuntimeMessage,
 	agentSchedulerId,
 	ContainerRuntime,
-	RuntimeHeaders,
-	AllowTombstoneRequestHeaderKey,
-	AllowInactiveRequestHeaderKey,
 	TombstoneResponseHeaderKey,
 	InactiveResponseHeaderKey,
 	ISummaryConfiguration,
@@ -30,9 +27,17 @@ export {
 	IContainerRuntimeMessageCompatDetails,
 	CompatModeBehavior,
 	RecentlyAddedContainerRuntimeMessageDetails,
+	UnknownContainerRuntimeMessage,
 } from "./messageTypes";
 export { IBlobManagerLoadInfo } from "./blobManager";
 export { FluidDataStoreRegistry } from "./dataStoreRegistry";
+export {
+	detectOutboundReferences,
+	RuntimeHeaders,
+	DataStoresFactory,
+	AllowTombstoneRequestHeaderKey,
+	AllowInactiveRequestHeaderKey,
+} from "./dataStores";
 export {
 	GCNodeType,
 	IGCMetadata,

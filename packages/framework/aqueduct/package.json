@@ -175,6 +175,16 @@
 		}
 	},
 	"typeValidation": {
-		"broken": {}
+		"broken": {
+			"ClassDeclaration_DataObjectFactory": {
+				"forwardCompat": false
+			},
+			"ClassDeclaration_PureDataObjectFactory": {
+				"forwardCompat": false
+			},
+			"InterfaceDeclaration_IDataObjectProps": {
+				"forwardCompat": false
+			}
+		}
 	}
 }
