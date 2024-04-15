@@ -43,7 +43,7 @@ const testContainerConfig: ITestContainerConfig = {
 				},
 			},
 		},
-		enableRuntimeIdCompressor: true,
+		enableRuntimeIdCompressor: "on",
 	},
 	loaderProps: {
 		configProvider: configProvider({
@@ -82,37 +82,6 @@ const assertIntervals = (
 };
 
 describeCompat("IntervalCollection with stashed ops", "NoCompat", (getTestObjectProvider, apis) => {
-	const { SharedString } = apis.dds;
-
-	const registry: ChannelFactoryRegistry = [[stringId, SharedString.getFactory()]];
-	const configProvider = (settings: Record<string, ConfigTypes>): IConfigProviderBase => ({
-		getRawConfig: (name: string): ConfigTypes => settings[name],
-	});
-
-	const testContainerConfig: ITestContainerConfig = {
-		fluidDataObjectType: DataObjectFactoryType.Test,
-		registry,
-		runtimeOptions: {
-			summaryOptions: {
-				summaryConfigOverrides: {
-					...DefaultSummaryConfiguration,
-					...{
-						maxTime: 5000 * 12,
-						maxAckWaitTime: 120000,
-						maxOps: 1,
-						initialSummarizerDelayMs: 20,
-					},
-				},
-			},
-			enableRuntimeIdCompressor: "on",
-		},
-		loaderProps: {
-			configProvider: configProvider({
-				"Fluid.Container.enableOfflineLoad": true,
-			}),
-		},
-	};
-
 	let provider: ITestObjectProvider;
 	let container1: IContainerExperimental;
 	let sharedString1: SharedString;

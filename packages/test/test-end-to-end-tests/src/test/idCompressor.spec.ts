@@ -13,6 +13,7 @@ import {
 	createContainerRuntimeFactoryWithDefaultDataStore,
 	summarizeNow,
 	waitForContainerConnection,
+	getContainerEntryPointBackCompat,
 } from "@fluidframework/test-utils";
 import { ITestDataObject, describeCompat } from "@fluid-private/test-version-utils";
 import type { SharedCell } from "@fluidframework/cell";
@@ -38,7 +39,6 @@ import { ISummaryTree } from "@fluidframework/protocol-definitions";
 import { stringToBuffer } from "@fluid-internal/client-utils";
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { SharedDirectory } from "@fluidframework/map";
-import type { IChannel } from "@fluidframework/datastore-definitions";
 
 function getIdCompressor(dds: SharedObjectCore): IIdCompressor {
 	return (dds as any).runtime.idCompressor as IIdCompressor;
@@ -193,7 +193,7 @@ describeCompat("Runtime IdCompressor", "NoCompat", (getTestObjectProvider, apis)
 			],
 			fluidDataObjectType: DataObjectFactoryType.Test,
 			runtimeOptions: {
-				enableRuntimeIdCompressor: true,
+				enableRuntimeIdCompressor: "on",
 			},
 		};
 
@@ -330,7 +330,7 @@ describeCompat("Runtime IdCompressor", "NoCompat", (getTestObjectProvider, apis)
 		const container = await loader.createDetachedContainer(defaultCodeDetails);
 
 		const dataObject = await getContainerEntryPointBackCompat<ITestFluidObject>(container);
-		const map = await dataObject.getSharedObject<ISharedMap>("mapId");
+		const map = await dataObject.getSharedObject<SharedMap>("mapId");
 		const sessionSpaceId = getIdCompressor(map).generateCompressedId();
 
 		await container.attach(provider.driver.createCreateNewRequest("doc id"));
@@ -345,7 +345,7 @@ describeCompat("Runtime IdCompressor", "NoCompat", (getTestObjectProvider, apis)
 
 		const dataObject2 =
 			await getContainerEntryPointBackCompat<ITestFluidObject>(remoteContainer);
-		const map2 = await dataObject2.getSharedObject<ISharedMap>("mapId");
+		const map2 = await dataObject2.getSharedObject<SharedMap>("mapId");
 		const sessionSpaceId2 = getIdCompressor(map2).normalizeToSessionSpace(
 			opSpaceId,
 			getIdCompressor(map).localSessionId,
