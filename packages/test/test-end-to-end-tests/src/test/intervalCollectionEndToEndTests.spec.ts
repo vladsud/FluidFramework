@@ -113,7 +113,6 @@ describeCompat("IntervalCollection with stashed ops", "NoCompat", (getTestObject
 		},
 	};
 
->>>>>>> 51f0d3db73 (Expose compat ID generation at container level, use it for data stores & DDSs (#19859))
 	let provider: ITestObjectProvider;
 	let container1: IContainerExperimental;
 	let sharedString1: SharedString;
