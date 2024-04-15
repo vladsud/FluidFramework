@@ -157,6 +157,13 @@
 			"RemovedInterfaceDeclaration_IFluidDataStoreContextEvents": {
 				"forwardCompat": false,
 				"backCompat": false
+			},
+			"InterfaceDeclaration_IFluidDataStoreContext": {
+				"forwardCompat": false,
+				"backCompat": false
+			},
+			"InterfaceDeclaration_IIdCompressor": {
+				"forwardCompat": false
 			}
 		}
 	}
