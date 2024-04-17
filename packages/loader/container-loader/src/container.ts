@@ -1617,6 +1617,15 @@ export class Container
 			}
 		}
 
+		// Initialize the protocol handler (loads quorum)
+		// This has to be done before this.attachDeltaManagerOpHandler() below, as it will allow signals to go through
+		// from already established delta connection, if we are establishing connection in parallel (see this.connectToDeltaStream above)
+		await this.initializeProtocolStateFromSnapshot(
+			attributes,
+			this.storageAdapter,
+			baseSnapshot,
+		);
+
 		// Attach op handlers to finish initialization and be able to start processing ops
 		// Kick off any ops fetching if required.
 		switch (loadMode.opsBeforeReturn) {
@@ -1641,14 +1650,6 @@ export class Container
 			default:
 				unreachableCase(loadMode.opsBeforeReturn);
 		}
-
-		// ...load in the existing quorum
-		// Initialize the protocol handler
-		await this.initializeProtocolStateFromSnapshot(
-			attributes,
-			this.storageAdapter,
-			baseSnapshot,
-		);
 
 		timings.phase3 = performance.now();
 		const codeDetails = this.getCodeDetailsFromQuorum();
