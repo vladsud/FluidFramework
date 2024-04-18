@@ -879,15 +879,11 @@ export class Container
 
 					// If this is "write" connection, it took too long to receive join op. But in most cases that's due
 					// to very slow op fetches and we will eventually get there.
-					// For "read" connections, we get here due to self join signal not arriving on time. We will need to
-					// better understand when and why it may happen.
-					// For now, attempt to recover by reconnecting. In future, maybe we can query relay service for
-					// current state of audience.
-					// Other possible recovery path - move to connected state (i.e. ConnectionStateHandler.joinOpTimer
-					// to call this.applyForConnectedState("addMemberEvent") for "read" connections)
-					if (mode === "read") {
-						// Please note that this is not going to make a difference if we are in this._lifecycleState === "loading",
-						// as we are not processing any ops, so can't catch up.
+					// For "read" connections, we get here due to join signal for "self" not arriving on time.
+					if (mode === "read" && category === "error") {
+						// Attempt to recover by reconnecting.
+						// This is not going to make a difference if this._lifecycleState === "loading",
+						// as we are not processing any ops or signals, so can't catch up or see updates to Audience.
 						// That said, doing nothing maybe also not be an option, as if we lost JoinSignal, there is no recovery.
 						// So, in cases where it takes forever to load container, we may see ourselves reconnecting every 45 seconds.
 						// Ideal solution - get rid of modality where we establish connection too early (loadMode.deltaConnection === undefined mode).
@@ -902,8 +898,8 @@ export class Container
 				clientShouldHaveLeft: (clientId: string) => {
 					this.clientsWhoShouldHaveLeft.add(clientId);
 				},
-				onCriticalError: (error: ICriticalContainerError) => {
-					this.close(error);
+				onCriticalError: (error: unknown) => {
+					this.close(normalizeError(error));
 				},
 			},
 			this.deltaManager,
@@ -1355,12 +1351,12 @@ export class Container
 			0x2c6 /* "Attempting to connect() a container that is not attached" */,
 		);
 
-		// Resume processing ops and connect to delta stream
-		this.resumeInternal(args);
-
 		// Set Auto Reconnect Mode
 		const mode = ReconnectMode.Enabled;
 		this.setAutoReconnectInternal(mode, args.reason);
+
+		// Resume processing ops and connect to delta stream
+		this.resumeInternal(args);
 	}
 
 	public disconnect() {
@@ -1384,8 +1380,10 @@ export class Container
 
 		// Resume processing ops
 		if (this.inboundQueuePausedFromInit) {
-			// Failure to do so may result in us processing signals when we have no protocolHandler setup yet
-			// Same for ops.
+			// If this assert fires guards against possibility to allow ops/signals in too soon, while
+			// container is not ready yet to receive them. We can hit it only if some internal code call into here,
+			// as public API like Container.connect() can be only called when user got back container object, i.e.
+			// it is already fully loaded.
 			assert(
 				this._lifecycleState === "loaded",
 				"connect() can be called only in fully loaded state",
