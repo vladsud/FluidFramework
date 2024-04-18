@@ -973,7 +973,7 @@ export class ConnectionManager implements IConnectionManager {
 	 * @param error - Error reconnect information including whether or not to reconnect
 	 * @returns A promise that resolves when the connection is reestablished or we stop trying
 	 */
-	private async reconnect(
+	public async reconnect(
 		requestedMode: ConnectionMode,
 		reason: IConnectionStateChangeReason<IAnyDriverError>,
 	) {

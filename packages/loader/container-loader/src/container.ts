@@ -885,9 +885,17 @@ export class Container
 					// Other possible recovery path - move to connected state (i.e. ConnectionStateHandler.joinOpTimer
 					// to call this.applyForConnectedState("addMemberEvent") for "read" connections)
 					if (mode === "read") {
-						const reason = { text: "NoJoinSignal" };
-						this.disconnectInternal(reason);
-						this.connectInternal({ reason, fetchOpsFromStorage: false });
+						// Please note that this is not going to make a difference if we are in this._lifecycleState === "loading",
+						// as we are not processing any ops, so can't catch up.
+						// That said, doing nothing maybe also not be an option, as if we lost JoinSignal, there is no recovery.
+						// So, in cases where it takes forever to load container, we may see ourselves reconnecting every 45 seconds.
+						// Ideal solution - get rid of modality where we establish connection too early (loadMode.deltaConnection === undefined mode).
+						this._deltaManager.connectionManager
+							.reconnect(
+								"write", // connectionMode
+								{ text: "NoJoinSignal" }, // reason
+							)
+							.catch((error) => this.close(error));
 					}
 				},
 				clientShouldHaveLeft: (clientId: string) => {
@@ -1372,6 +1380,13 @@ export class Container
 
 		// Resume processing ops
 		if (this.inboundQueuePausedFromInit) {
+			// Failure to do so may result in us processing signals when we have no protocolHandler setup yet
+			// Same for ops.
+			assert(
+				this._lifecycleState === "loaded",
+				"connect() can be called only in fully loaded state",
+			);
+
 			this.inboundQueuePausedFromInit = false;
 			this._deltaManager.inbound.resume();
 			this._deltaManager.inboundSignal.resume();
