@@ -1310,13 +1310,10 @@ export class Container
 					const snapshotWithBlobs = await attachP;
 					this.serializedStateManager.setInitialSnapshot(snapshotWithBlobs);
 					if (!this.closed) {
-						this.handleDeltaConnectionArg(
-							{
-								fetchOpsFromStorage: false,
-								reason: { text: "createDetached" },
-							},
-							attachProps?.deltaConnection,
-						);
+						this.handleDeltaConnectionArg(attachProps?.deltaConnection, {
+							fetchOpsFromStorage: false,
+							reason: { text: "createDetached" },
+						});
 					}
 				},
 				{ start: true, end: true, cancel: "generic" },
@@ -1569,7 +1566,7 @@ export class Container
 
 		// Start websocket connection as soon as possible. Note that there is no op handler attached yet, but the
 		// DeltaManager is resilient to this and will wait to start processing ops until after it is attached.
-		if (loadMode.deltaConnection === undefined && !pendingLocalState) {
+		if (loadMode.deltaConnection === undefined) {
 			this.connectToDeltaStream(connectionArgs);
 		}
 
@@ -1730,11 +1727,7 @@ export class Container
 				this._deltaManager.inbound.pause();
 			}
 
-			this.handleDeltaConnectionArg(
-				connectionArgs,
-				loadMode.deltaConnection,
-				pendingLocalState !== undefined,
-			);
+			this.handleDeltaConnectionArg(loadMode.deltaConnection);
 		}
 
 		// If we have not yet reached `loadToSequenceNumber`, we will wait for ops to arrive until we reach it
@@ -2203,14 +2196,14 @@ export class Container
 		// After that, we communicate only transitions to Connected & Disconnected states, skipping all other states.
 		// This can be changed in the future, for example we likely should add "CatchingUp" event on Container.
 		if (
-			!initialTransition &&
-			this.connectionState !== ConnectionState.Connected &&
-			this.connectionState !== ConnectionState.Disconnected
+			!this.loaded ||
+			(!initialTransition &&
+				this.connectionState !== ConnectionState.Connected &&
+				this.connectionState !== ConnectionState.Disconnected)
 		) {
 			return;
 		}
 
-		assert(this.loaded, "loaded");
 		const state = this.connectionState === ConnectionState.Connected;
 
 		// Both protocol and context should not be undefined if we got so far.
@@ -2471,13 +2464,12 @@ export class Container
 	}
 
 	private handleDeltaConnectionArg(
-		connectionArgs: IConnectionArgs,
 		deltaConnectionArg?: "none" | "delayed",
-		canConnect: boolean = true,
+		connectionArgs?: IConnectionArgs,
 	) {
 		switch (deltaConnectionArg) {
 			case undefined:
-				if (canConnect) {
+				if (connectionArgs) {
 					// connect to delta stream now since we did not before
 					this.connectToDeltaStream(connectionArgs);
 				}
