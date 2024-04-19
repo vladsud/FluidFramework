@@ -513,9 +513,20 @@ export class Container
 		// It's conceivable the container could be closed when this is called
 		// Only transition states if currently loading
 		if (this._lifecycleState === "loading") {
-			// Propagate current connection state through the system.
-			this.propagateConnectionState(true /* initial transition */);
 			this._lifecycleState = "loaded";
+
+			// Propagate current connection state through the system.
+			// This call does not look like needed any more, with delaying all connection-related events
+			// past loaded phase. Yet, there could be some customer code that would break if we do not delivery it.
+			// Will be removed in further PRs with proper changeset.
+			this.propagateConnectionState(true /* initial transition */);
+
+			// Deliver delayed calls to DeltaManager - we ignored "connect" events while loading.
+			const cm = this._deltaManager.connectionManager;
+			if (cm.connected) {
+				const details = cm.connectionDetails;
+				this.connectionStateHandler.receivedConnectEvent(details);
+			}
 		}
 	}
 
@@ -523,6 +534,10 @@ export class Container
 		return (
 			this._lifecycleState === "closing" || this._lifecycleState === "closed" || this.disposed
 		);
+	}
+
+	public get loaded(): boolean {
+		return this._lifecycleState === "loaded";
 	}
 
 	public get disposed(): boolean {
@@ -845,14 +860,12 @@ export class Container
 						this._clientId = this.connectionStateHandler.pendingClientId;
 					}
 					this.logConnectionStateChangeTelemetry(value, oldState, reason);
-					if (this._lifecycleState === "loaded") {
-						this.propagateConnectionState(
-							false /* initial transition */,
-							value === ConnectionState.Disconnected
-								? reason
-								: undefined /* disconnectedReason */,
-						);
-					}
+					this.propagateConnectionState(
+						false /* initial transition */,
+						value === ConnectionState.Disconnected
+							? reason
+							: undefined /* disconnectedReason */,
+					);
 				},
 				shouldClientJoinWrite: () => this._deltaManager.connectionManager.shouldJoinWrite(),
 				maxClientLeaveWaitTime: options.maxClientLeaveWaitTime,
@@ -877,16 +890,21 @@ export class Container
 						...(details === undefined ? {} : { details: JSON.stringify(details) }),
 					});
 
+					// This is important for many reasons:
+					// 1) Cosmetic / OCE burden: It's useless to raise NoJoinOp error events, if we are loading,
+					//    as that's most likely to to snapshot taking too long to load. During this time we are not processing ops
+					//    so there is no way to move to "connected" state, and thus timer would fire. But these events do not tell us
+					//    anything about connectivity pipeline / op processing pipeline, only that boot is slow, and we have events for that.
+					// 2) Doing recovery below is useless in loading mode, for the reasons described above. At the same time
+					//    we can't not do it, as maybe we actually lost JoinSignal for "self", and when loading is done, we never move to
+					//    connected state. So we would have to do (in most cases) useless infinite reconnect loop while we are loading.
+					assert(this.loaded, "loaded");
+
 					// If this is "write" connection, it took too long to receive join op. But in most cases that's due
 					// to very slow op fetches and we will eventually get there.
 					// For "read" connections, we get here due to join signal for "self" not arriving on time.
+					// Attempt to recover by reconnecting.
 					if (mode === "read" && category === "error") {
-						// Attempt to recover by reconnecting.
-						// This is not going to make a difference if this._lifecycleState === "loading",
-						// as we are not processing any ops or signals, so can't catch up or see updates to Audience.
-						// That said, doing nothing maybe also not be an option, as if we lost JoinSignal, there is no recovery.
-						// So, in cases where it takes forever to load container, we may see ourselves reconnecting every 45 seconds.
-						// Ideal solution - get rid of modality where we establish connection too early (loadMode.deltaConnection === undefined mode).
 						this._deltaManager.connectionManager
 							.reconnect(
 								"write", // connectionMode
@@ -1123,7 +1141,7 @@ export class Container
 	}
 
 	private async getPendingLocalStateCore(props: IGetPendingLocalStateProps) {
-		if (this.closed || this._disposed) {
+		if (this.closed) {
 			throw new UsageError(
 				"Pending state cannot be retried if the container is closed or disposed",
 			);
@@ -2023,7 +2041,22 @@ export class Container
 
 		deltaManager.on("connect", (details: IConnectionDetailsInternal, _opsBehind?: number) => {
 			assert(this.connectionMode === details.mode, 0x4b7 /* mismatch */);
-			this.connectionStateHandler.receivedConnectEvent(details);
+
+			// Delay raising events until setLoaded()
+			// Here are some of the reasons why this design is chosen:
+			// 1. Various processes track speed of connection. But we are not processing ops or signal while container is loading,
+			//    and thus we can't move forward across connection modes. This results in telemetry errors (like NoJoinOp) that
+			//    have nothing to do with connection flow itself
+			// 2. This also makes it hard to reason about recovery (like reconnection) in case we might have lost JoinSignal. Reconnecting
+			//    in loading phase is useless (get back to same state), but at the same time not doing it may result in broken connection
+			//    without recovery (after we loaded).
+			// 3. We expose non-consistent view. ContainerRuntime may start loading in non-connected state, but end in connected, with
+			//    no events telling about it (until we loaded). Most of the code relies on a fact that state changes when events fire.
+			// Please note that this will not delay any processes (as observed by the user)
+			// I.e. once container moves to loaded phase, we immediately would transition across all phases, if we have proper signals / ops ready.
+			if (this.loaded) {
+				this.connectionStateHandler.receivedConnectEvent(details);
+			}
 		});
 
 		deltaManager.on("establishingConnection", (reason: IConnectionStateChangeReason) => {
@@ -2036,8 +2069,13 @@ export class Container
 
 		deltaManager.on("disconnect", (text, error) => {
 			this.noopHeuristic?.notifyDisconnect();
-			if (!this.closed) {
-				this.connectionStateHandler.receivedDisconnectEvent({ text, error });
+			const reason = { text, error };
+			// Symmetry with "connect" events
+			if (this.loaded) {
+				this.connectionStateHandler.receivedDisconnectEvent(reason);
+			} else if (!this.closed) {
+				// Raise cancelation to get state machine back to initial state
+				this.connectionStateHandler.cancelEstablishingConnection(reason);
 			}
 		});
 
@@ -2052,11 +2090,13 @@ export class Container
 		});
 
 		deltaManager.on("readonly", (readonly) => {
-			this.setContextConnectedState(
-				this.connectionState === ConnectionState.Connected,
-				readonly,
-			);
-			this.emit("readonly", readonly);
+			if (this.loaded) {
+				this.setContextConnectedState(
+					this.connectionState === ConnectionState.Connected,
+					readonly,
+				);
+				this.emit("readonly", readonly);
+			}
 		});
 
 		deltaManager.on("closed", (error?: ICriticalContainerError) => {
@@ -2169,6 +2209,8 @@ export class Container
 		) {
 			return;
 		}
+
+		assert(this.loaded, "loaded");
 		const state = this.connectionState === ConnectionState.Connected;
 
 		// Both protocol and context should not be undefined if we got so far.
