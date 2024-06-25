@@ -6,7 +6,14 @@
 import { strict as assert } from "assert";
 
 import { stringToBuffer } from "@fluid-internal/client-utils";
-import { ITestDataObject, describeCompat, itExpects } from "@fluid-private/test-version-utils";
+import {
+	ITestDataObject,
+	describeCompat,
+	describeInstallVersions,
+	getContainerRuntimeApi,
+	getDataRuntimeApi,
+	itExpects,
+} from "@fluid-private/test-version-utils";
 import { IContainer, LoaderHeader } from "@fluidframework/container-definitions/internal";
 import {
 	ContainerMessageType,
@@ -37,6 +44,7 @@ import {
 	createTestConfigProvider,
 	summarizeNow,
 	waitForContainerConnection,
+	type ITestFluidObject,
 } from "@fluidframework/test-utils/internal";
 
 import {
@@ -1371,5 +1379,105 @@ describeCompat("GC attachment blob sweep tests", "NoCompat", (getTestObjectProvi
 				},
 			);
 		}
+	});
+});
+
+const loaderWithRequest = "2.0.0-internal.6.4.0";
+const runtimeVersion1 = "2.0.0-rc.3.0.8";
+const runtimeVersion2 = "2.0.0-rc.2.0.8";
+
+// describeInstallVersions({
+// 	requestAbsoluteVersions: [loaderWithRequest, runtimeVersion1, runtimeVersion2],
+// })("loader compat", (_) => {
+// 	let provider: ITestObjectProvider;
+// 	const testContainerConfig: ITestContainerConfig = {
+// 		runtimeOptions: {
+// 			enableGroupedBatching: true,
+// 		},
+// 	};
+
+// 	beforeEach("getVersionedTestObjectProvider", async () => {
+// 		provider = await getVersionedTestObjectProvider(
+// 			runtimeVersion1, // base version
+// 			loaderWithRequest,
+// 		);
+// 	});
+
+// 	afterEach(() => {
+// 		provider.reset();
+// 	});
+
+// 	it.only("request pattern works", async () => {
+// 		const container = await provider.makeTestContainer(testContainerConfig);
+// 		const dataStore = (await container.getEntryPoint()) as ITestDataObject;
+
+// 		// Send an op to transition the container to write mode.
+// 		dataStore._root.set("transition to write", "true");
+// 		await waitForContainerConnection(container, true);
+
+// 		const container2 = await provider.loadTestContainer(testContainerConfig);
+// 		const dataStore2 = (await container2.getEntryPoint()) as ITestDataObject;
+
+// 		await provider.ensureSynchronized();
+
+// 		const ds = await dataStore._context.containerRuntime.createDataStore(TestDataObjectType);
+// 		dataStore._root.set("ds", ds.entryPoint);
+// 		dataStore._root.set("dsss", "a");
+
+// 		await provider.ensureSynchronized();
+// 		assert(dataStore2._root.get("ds") !== undefined);
+// 	});
+// });
+
+describeInstallVersions({
+	requestAbsoluteVersions: [runtimeVersion1, runtimeVersion2],
+})("loader compat", (getTestObjectProvider) => {
+	function getRuntimeFactory(version: string) {
+		const dataApi1 = getDataRuntimeApi(version);
+		const runtimeApiI = getContainerRuntimeApi(version);
+		const dataObjectFactory1 = new dataApi1.TestFluidObjectFactory([]);
+		return new runtimeApiI.ContainerRuntimeFactoryWithDefaultDataStore({
+			defaultFactory: dataObjectFactory1,
+			registryEntries: [[dataObjectFactory1.type, Promise.resolve(dataObjectFactory1)]],
+			runtimeOptions: { enableGroupedBatching: true },
+		});
+	}
+
+	let provider: ITestObjectProvider;
+
+	beforeEach("getVersionedTestObjectProvider", async () => {
+		// await getVersionedTestObjectProvider(
+		// 	runtimeVersion1, // base version
+		// );
+		// await getVersionedTestObjectProvider(
+		// 	runtimeVersion2, // base version
+		// );
+		provider = getTestObjectProvider();
+	});
+
+	it.only("test", async () => {
+		const container1 = await provider.createContainer(getRuntimeFactory(runtimeVersion1));
+		const dataStore1 = (await container1.getEntryPoint()) as ITestFluidObject;
+		dataStore1.root.set("transition to write", "true");
+		await waitForContainerConnection(container1, true);
+
+		const container2 = await provider.loadContainer(getRuntimeFactory(runtimeVersion2));
+		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
+
+		dataStore1.root.set("1", "2");
+		dataStore1.root.set("2", "3");
+
+		await provider.ensureSynchronized();
+		assert(dataStore2.root.get("2"), "3");
+
+		const container3 = await provider.loadContainer(getRuntimeFactory(runtimeVersion2));
+		const dataStore3 = (await container3.getEntryPoint()) as ITestFluidObject;
+
+		await provider.ensureSynchronized();
+		assert(dataStore3.root.get("2"), "3");
+	});
+
+	afterEach(() => {
+		provider.reset();
 	});
 });
