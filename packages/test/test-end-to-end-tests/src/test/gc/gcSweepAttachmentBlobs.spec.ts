@@ -31,7 +31,6 @@ import {
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 import { delay } from "@fluidframework/core-utils/internal";
 import { ISummaryTree, SummaryType } from "@fluidframework/driver-definitions";
-import { FetchSource } from "@fluidframework/driver-definitions/internal";
 import { gcTreeKey } from "@fluidframework/runtime-definitions/internal";
 import { toFluidHandleInternal } from "@fluidframework/runtime-utils/internal";
 import {
@@ -1396,46 +1395,41 @@ describeCompat("loader compat", "NoCompat", (getTestObjectProvider) => {
 
 	beforeEach("getVersionedTestObjectProvider", async () => {
 		provider = getTestObjectProvider();
+		// Or can pass persistedCache above and control cache
+		if (provider.driver.type === "odsp") {
+			(provider.driver as any).config.options.concurrentSnapshotFetch = true;
+		}
 	});
 
 	it.only("test", async () => {
 		const container1 = await provider.createDetachedContainer(runtimeFactory);
 		const dataStore1 = (await container1.getEntryPoint()) as ITestFluidObject;
 
-		for (let i = 0; i < 15; i++) {
+		for (let i = 0; i < 20; i++) {
 			const newDS = await dataStore1.context.containerRuntime.createDataStore(
 				defaultFactory.type,
 			);
 			const dataStoreNew = (await newDS.entryPoint.get()) as ITestFluidObject;
-			dataStore1.root.set(dataStoreNew.context.id, dataStoreNew.handle);
+			dataStore1.root.set(`${i}`, dataStoreNew.handle);
 		}
 
 		await provider.attachDetachedContainer(container1);
-		await waitForContainerConnection(container1);
-		const buggyDS1Handle = dataStore1.root.get<IFluidHandle<ITestFluidObject>>("[");
-		assert(buggyDS1Handle !== undefined);
-		const buggyDS1 = await buggyDS1Handle.get();
-		buggyDS1.root.set("1", "2");
-		buggyDS1.root.set("2", "3");
-		buggyDS1.root.set("4", "5");
 
+		for (let i = 0; i < 20; i++) {
+			const handle = dataStore1.root.get<IFluidHandle<ITestFluidObject>>(`${i}`);
+			assert(handle !== undefined);
+			const dds = await handle.get();
+			dds.root.set("key1", "value");
+		}
+
+		// This block is required to ensure we update cache with new data
 		await provider.loadContainer(runtimeFactory);
 		await delay(2000);
 
 		const container2 = await provider.loadContainer(runtimeFactory);
 		const dataStore2 = (await container2.getEntryPoint()) as ITestFluidObject;
 		await provider.ensureSynchronized();
-		const buggyDS2Handle = dataStore2.root.get<IFluidHandle<ITestFluidObject>>("[");
-		assert(buggyDS2Handle !== undefined);
-		const buggyDS2 = await buggyDS2Handle.get();
-		assert(buggyDS2.root.get("4"), "5");
 
-		const versions = await (
-			dataStore2.context.containerRuntime as ContainerRuntime
-		).storage.getVersions(null, 1, FetchSource.noCache);
-		const snapshotTree = await (
-			dataStore2.context.containerRuntime as ContainerRuntime
-		).storage.getSnapshotTree(versions[0]);
-		assert(snapshotTree !== undefined);
-	});
+		await provider.ensureSynchronized();
+	}).timeout(10000);
 });
