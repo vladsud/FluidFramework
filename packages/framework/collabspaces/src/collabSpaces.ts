@@ -756,10 +756,17 @@ export class CollabSpacesRuntime
 			throw new UsageError("Can't create channel for undefined cell");
 		}
 
-		return getInternalChannel(channelId, channel ?? this.createCollabChannel(value, channelId));
+		return getInternalChannel(
+			channelId,
+			channel ?? this.createCollabChannel(value, channelId),
+		);
 	}
 
-	private parseChannelId(channelId: string): { rowId: string; colId: string; iteration: string } {
+	private parseChannelId(channelId: string): {
+		rowId: string;
+		colId: string;
+		iteration: string;
+	} {
 		const parts = channelId.split(",");
 		assert(parts.length === 3, "Invalid channel Id");
 		const rowId = parts[0];
@@ -898,7 +905,10 @@ export class CollabSpacesRuntime
 
 		assert(channelnfo.type === value.type, "Types differ!");
 		assert(!isChannelDeferred(channelnfo.type), "channel should not be deferred");
-		assert(this.deferredChannels[channelId] === undefined, "Rooted channel can't be deferred!");
+		assert(
+			this.deferredChannels[channelId] === undefined,
+			"Rooted channel can't be deferred!",
+		);
 
 		let refSeq: number;
 		let saved: boolean;
@@ -920,10 +930,7 @@ export class CollabSpacesRuntime
 			refSeq = valueCreatedAttachedSeq;
 			if (value.seq !== refSeq) {
 				// Never saved - attempt to save
-				assert(
-					value.seq === valueCreatedDetachedSeq,
-					"Value should also be created detached",
-				);
+				assert(value.seq === valueCreatedDetachedSeq, "Value should also be created detached");
 				saved = allowSave;
 				destroyed = false;
 			} else {
@@ -1069,7 +1076,9 @@ export class CollabSpacesRuntime
 
 	// #region IMatrixProducer
 
-	openMatrix(consumer: IMatrixConsumer<CollabSpaceCellType>): IMatrixReader<CollabSpaceCellType> {
+	openMatrix(
+		consumer: IMatrixConsumer<CollabSpaceCellType>,
+	): IMatrixReader<CollabSpaceCellType> {
 		this.matrix.openMatrix(consumer);
 		return this;
 	}

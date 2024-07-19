@@ -87,10 +87,7 @@ export class RuntimeFactory extends BaseContainerRuntimeFactory {
 
 		super({
 			registryEntries: [
-				[
-					RuntimeFactory.defaultFactory.type,
-					Promise.resolve(RuntimeFactory.defaultFactory),
-				],
+				[RuntimeFactory.defaultFactory.type, Promise.resolve(RuntimeFactory.defaultFactory)],
 				[TestDataObject.Type, Promise.resolve(TestDataObject.factory)],
 			],
 			requestHandlers: [],
@@ -646,10 +643,7 @@ describe("Temporal Collab Spaces", () => {
 					nextRowId === debugCellInfo.rowId,
 					"rowId after removal should be the same as nextRowId",
 				);
-				assert(
-					nextColId === debugCellInfo.colId,
-					"colId after removal should be different",
-				);
+				assert(nextColId === debugCellInfo.colId, "colId after removal should be different");
 
 				const debugMapInfo = collabSpace.getReverseMapsDebugInfo();
 

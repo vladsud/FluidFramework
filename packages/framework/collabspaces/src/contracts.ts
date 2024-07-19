@@ -29,7 +29,9 @@ export interface IInternalChannel<T extends ICollabChannel = ICollabChannel> {
 }
 
 /** @internal */
-export function getCollabValue<T extends ICollabChannel>(channel: IInternalChannel<T>): T["value"] {
+export function getCollabValue<T extends ICollabChannel>(
+	channel: IInternalChannel<T>,
+): T["value"] {
 	return channel.value.value;
 }
 
@@ -127,5 +129,8 @@ export interface IEfficientMatrixTest {
 		colMap: { [id: string]: number };
 	}>;
 
-	getReverseMapCellDebugInfo(rowId: string, colId: string): Promise<{ row: number; col: number }>;
+	getReverseMapCellDebugInfo(
+		rowId: string,
+		colId: string,
+	): Promise<{ row: number; col: number }>;
 }
