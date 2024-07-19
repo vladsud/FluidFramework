@@ -7,19 +7,19 @@ import { strict as assert } from "assert";
 import { join as pathJoin } from "path";
 
 import { makeRandom } from "@fluid-private/stochastic-test-utils";
-import { FuzzSerializedIdCompressor } from "@fluid-private/test-dds-utils";
+import type { FuzzSerializedIdCompressor } from "@fluid-private/test-dds-utils";
+import type { SessionId } from "@fluidframework/id-compressor";
 import {
-	SessionId,
 	createIdCompressor,
 	deserializeIdCompressor,
 } from "@fluidframework/id-compressor/internal";
 
 import {
-	Anchor,
-	Revertible,
+	type Anchor,
+	type Revertible,
 	TreeNavigationResult,
-	UpPath,
-	Value,
+	type UpPath,
+	type Value,
 	clonePath,
 	forEachNodeInSubtree,
 	moveToDetachedField,
@@ -29,13 +29,13 @@ import {
 	Any,
 	FieldKinds,
 	FlexFieldSchema,
-	FlexTreeObjectNodeTyped,
-	LeafNodeSchema,
-	SchemaLibrary,
+	type FlexTreeObjectNodeTyped,
+	type LeafNodeSchema,
+	type SchemaLibrary,
 	intoStoredSchema,
 	typeNameSymbol,
 } from "../../../feature-libraries/index.js";
-import { ITreeCheckout, SharedTree, TreeContent } from "../../../shared-tree/index.js";
+import type { ITreeCheckout, SharedTree, TreeContent } from "../../../shared-tree/index.js";
 import { testSrcPath } from "../../testSrcPath.cjs";
 import { expectEqualPaths } from "../../utils.js";
 
@@ -74,18 +74,21 @@ export function createFuzzNode(
 			() => node,
 			leaf.number,
 			leaf.string,
+			leaf.handle,
 			...nodeTypes,
 		]),
 		optionalChild: FlexFieldSchema.createUnsafe(FieldKinds.optional, [
 			() => node,
 			leaf.number,
 			leaf.string,
+			leaf.handle,
 			...nodeTypes,
 		]),
 		sequenceChildren: FlexFieldSchema.createUnsafe(FieldKinds.sequence, [
 			() => node,
 			leaf.number,
 			leaf.string,
+			leaf.handle,
 			...nodeTypes,
 		]),
 	});
@@ -118,10 +121,14 @@ export function validateAnchors(
 	view: ITreeCheckout,
 	anchors: ReadonlyMap<Anchor, [UpPath, Value]>,
 	checkPaths: boolean,
+	tolerateLostAnchors = true,
 ) {
 	const cursor = view.forest.allocateCursor();
 	for (const [anchor, [path, value]] of anchors) {
 		const result = view.forest.tryMoveCursorToNode(anchor, cursor);
+		if (tolerateLostAnchors && result === TreeNavigationResult.NotFound) {
+			continue;
+		}
 		assert.equal(result, TreeNavigationResult.Ok);
 		assert.equal(cursor.value, value);
 		if (checkPaths) {
@@ -166,13 +173,15 @@ export const createOrDeserializeCompressor = (
 	return summary === undefined
 		? createIdCompressor(sessionId)
 		: summary.withSession
-		? deserializeIdCompressor(summary.serializedCompressor)
-		: deserializeIdCompressor(summary.serializedCompressor, sessionId);
+			? deserializeIdCompressor(summary.serializedCompressor)
+			: deserializeIdCompressor(summary.serializedCompressor, sessionId);
 };
 
 export const deterministicIdCompressorFactory: (
 	seed: number,
-) => (summary?: FuzzSerializedIdCompressor) => ReturnType<typeof createIdCompressor> = (seed) => {
+) => (summary?: FuzzSerializedIdCompressor) => ReturnType<typeof createIdCompressor> = (
+	seed,
+) => {
 	const random = makeRandom(seed);
 	return (summary?: FuzzSerializedIdCompressor) => {
 		const sessionId = random.uuid4() as SessionId;
@@ -180,29 +189,30 @@ export const deterministicIdCompressorFactory: (
 	};
 };
 
-export const populatedInitialState: TreeContent<typeof fuzzSchema.rootFieldSchema>["initialTree"] =
-	{
-		[typeNameSymbol]: fuzzNode.name,
-		sequenceChildren: [
-			{
-				[typeNameSymbol]: fuzzNode.name,
-				sequenceChildren: ["AA", "AB", "AC"],
-				requiredChild: "A",
-				optionalChild: undefined,
-			},
-			{
-				[typeNameSymbol]: fuzzNode.name,
-				sequenceChildren: ["BA", "BB", "BC"],
-				requiredChild: "B",
-				optionalChild: undefined,
-			},
-			{
-				[typeNameSymbol]: fuzzNode.name,
-				sequenceChildren: ["CA", "CB", "CC"],
-				requiredChild: "C",
-				optionalChild: undefined,
-			},
-		],
-		requiredChild: "R",
-		optionalChild: undefined,
-	};
+export const populatedInitialState: TreeContent<
+	typeof fuzzSchema.rootFieldSchema
+>["initialTree"] = {
+	[typeNameSymbol]: fuzzNode.name,
+	sequenceChildren: [
+		{
+			[typeNameSymbol]: fuzzNode.name,
+			sequenceChildren: ["AA", "AB", "AC"],
+			requiredChild: "A",
+			optionalChild: undefined,
+		},
+		{
+			[typeNameSymbol]: fuzzNode.name,
+			sequenceChildren: ["BA", "BB", "BC"],
+			requiredChild: "B",
+			optionalChild: undefined,
+		},
+		{
+			[typeNameSymbol]: fuzzNode.name,
+			sequenceChildren: ["CA", "CB", "CC"],
+			requiredChild: "C",
+			optionalChild: undefined,
+		},
+	],
+	requiredChild: "R",
+	optionalChild: undefined,
+};

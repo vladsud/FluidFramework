@@ -6,20 +6,17 @@
 import { Uint8ArrayToString, performance, stringToBuffer } from "@fluid-internal/client-utils";
 import { assert } from "@fluidframework/core-utils/internal";
 import { getW3CData, promiseRaceWithWinner } from "@fluidframework/driver-base/internal";
+import { ISummaryHandle, ISummaryTree } from "@fluidframework/driver-definitions";
 import {
 	IDocumentStorageService,
 	IDocumentStorageServicePolicies,
 	ISummaryContext,
-} from "@fluidframework/driver-definitions/internal";
-import {
 	ICreateBlobResponse,
 	ISnapshotTree,
-	ISummaryHandle,
-	ISummaryTree,
 	IVersion,
-} from "@fluidframework/protocol-definitions";
-import { ITelemetryLoggerExt } from "@fluidframework/telemetry-utils";
+} from "@fluidframework/driver-definitions/internal";
 import {
+	ITelemetryLoggerExt,
 	MonitoringContext,
 	PerformanceEvent,
 	createChildMonitoringContext,
@@ -164,13 +161,14 @@ export class WholeSummaryDocumentStorageService implements IDocumentStorageServi
 	// eslint-disable-next-line @rushstack/no-new-null
 	public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTree | null> {
 		let requestVersion = version;
-		if (!requestVersion) {
+		if (requestVersion === undefined) {
 			const versions = await this.getVersions(this.id, 1);
-			if (versions.length === 0) {
+			const firstVersion = versions[0];
+			if (firstVersion === undefined) {
 				return null;
 			}
 
-			requestVersion = versions[0];
+			requestVersion = firstVersion;
 		}
 
 		let normalizedWholeSnapshot = await this.snapshotTreeCache.get(
@@ -215,7 +213,6 @@ export class WholeSummaryDocumentStorageService implements IDocumentStorageServi
 				return response;
 			},
 			undefined, // workers
-			undefined, // recordHeapSize
 			this.mc.config.getNumber("Fluid.Driver.ReadBlobTelemetrySampling"),
 		);
 		const bufferValue = stringToBuffer(blob.content, blob.encoding);

@@ -7,16 +7,19 @@ import {
 	IChannel,
 	IChannelAttributes,
 	IChannelFactory,
-	IChannelServices,
 	IFluidDataStoreRuntime,
-} from "@fluidframework/datastore-definitions";
+	IChannelServices,
+} from "@fluidframework/datastore-definitions/internal";
+import { createSharedObjectKind } from "@fluidframework/shared-object-base/internal";
 
-import { type ISharedMatrix, SharedMatrix } from "./matrix.js";
+import { type ISharedMatrix, SharedMatrix as SharedMatrixClass } from "./matrix.js";
 import { pkgVersion } from "./packageVersion.js";
 
 /**
- * {@link @fluidframework/datastore-definitions#IChannelFactory} for {@link SharedMatrix}.
+ * {@link @fluidframework/datastore-definitions#IChannelFactory} for {@link ISharedMatrix}.
+ * @legacy
  * @alpha
+ * @deprecated - Use `SharedMatrix.getFactory` instead.
  */
 export class SharedMatrixFactory implements IChannelFactory<ISharedMatrix> {
 	public static Type = "https://graph.microsoft.com/types/sharedmatrix";
@@ -27,11 +30,11 @@ export class SharedMatrixFactory implements IChannelFactory<ISharedMatrix> {
 		packageVersion: pkgVersion,
 	};
 
-	public get type() {
+	public get type(): string {
 		return SharedMatrixFactory.Type;
 	}
 
-	public get attributes() {
+	public get attributes(): IChannelAttributes {
 		return SharedMatrixFactory.Attributes;
 	}
 
@@ -44,14 +47,34 @@ export class SharedMatrixFactory implements IChannelFactory<ISharedMatrix> {
 		services: IChannelServices,
 		attributes: IChannelAttributes,
 	): Promise<ISharedMatrix & IChannel> {
-		const matrix = new SharedMatrix(runtime, id, attributes);
+		const matrix = new SharedMatrixClass(runtime, id, attributes);
 		await matrix.load(services);
 		return matrix;
 	}
 
 	public create(document: IFluidDataStoreRuntime, id: string): ISharedMatrix & IChannel {
-		const matrix = new SharedMatrix(document, id, this.attributes);
+		const matrix = new SharedMatrixClass(document, id, this.attributes);
 		matrix.initializeLocal();
 		return matrix;
 	}
 }
+
+/**
+ * Entrypoint for {@link ISharedMatrix} creation.
+ * @legacy
+ * @alpha
+ */
+export const SharedMatrix = createSharedObjectKind<ISharedMatrix>(SharedMatrixFactory);
+
+/**
+ * Convenience alias for {@link ISharedMatrix}. Prefer to use {@link ISharedMatrix} when referring to
+ * SharedMatrix as a type.
+ * @legacy
+ * @alpha
+ * @privateRemarks
+ * This alias is for legacy compat from when the SharedMatrix class was exported as public.
+ */
+// Changing this to `unknown` would be a breaking change.
+// TODO: if possible, transition SharedMatrix to not use `any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SharedMatrix<T = any> = ISharedMatrix<T>;

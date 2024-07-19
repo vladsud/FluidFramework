@@ -4,21 +4,18 @@
  */
 
 import { Uint8ArrayToString, stringToBuffer } from "@fluid-internal/client-utils";
+import { ISummaryHandle, ISummaryTree } from "@fluidframework/driver-definitions";
 import {
 	IDocumentStorageService,
 	IDocumentStorageServicePolicies,
 	ISummaryContext,
-} from "@fluidframework/driver-definitions/internal";
-import { buildGitTreeHierarchy } from "@fluidframework/protocol-base";
-import {
 	ICreateBlobResponse,
 	ISnapshotTreeEx,
-	ISummaryHandle,
-	ISummaryTree,
 	IVersion,
-} from "@fluidframework/protocol-definitions";
-import { ITelemetryLoggerExt } from "@fluidframework/telemetry-utils";
+} from "@fluidframework/driver-definitions/internal";
+import { buildGitTreeHierarchy } from "@fluidframework/driver-utils/internal";
 import {
+	ITelemetryLoggerExt,
 	MonitoringContext,
 	PerformanceEvent,
 	createChildMonitoringContext,
@@ -101,13 +98,14 @@ export class ShreddedSummaryDocumentStorageService implements IDocumentStorageSe
 
 	public async getSnapshotTree(version?: IVersion): Promise<ISnapshotTreeEx | null> {
 		let requestVersion = version;
-		if (!requestVersion) {
+		if (requestVersion === undefined) {
 			const versions = await this.getVersions(this.id, 1);
-			if (versions.length === 0) {
+			const firstVersion = versions[0];
+			if (firstVersion === undefined) {
 				return null;
 			}
 
-			requestVersion = versions[0];
+			requestVersion = firstVersion;
 		}
 
 		const cachedSnapshotTree = await this.snapshotTreeCache?.get(
@@ -125,7 +123,7 @@ export class ShreddedSummaryDocumentStorageService implements IDocumentStorageSe
 			},
 			async (event) => {
 				const manager = await this.getStorageManager();
-				const response = (await manager.getTree(requestVersion!.treeId)).content;
+				const response = (await manager.getTree(requestVersion.treeId)).content;
 				event.end({
 					size: response.tree.length,
 				});
@@ -161,7 +159,6 @@ export class ShreddedSummaryDocumentStorageService implements IDocumentStorageSe
 				return response;
 			},
 			undefined, // workers
-			undefined, // recordHeapSize
 			this.mc.config.getNumber("Fluid.Driver.ReadBlobTelemetrySampling"),
 		);
 		this.blobsShaCache.set(value.sha, "");
@@ -227,7 +224,7 @@ export class ShreddedSummaryDocumentStorageService implements IDocumentStorageSe
 					// Clear the cache as the getSnapshotTree call will fill the cache.
 					this.blobsShaCache.clear();
 					return this.getSnapshotTree(versions[0]);
-			  })
+				})
 			: undefined;
 	}
 

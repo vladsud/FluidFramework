@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import {
+import type {
 	IEvent,
 	IEventProvider,
 	IEventTransformer,
@@ -17,12 +17,14 @@ import { EventEmitter } from "./eventEmitter.cjs";
  * string | symbol vs. string | number
  *
  * The polyfill is now always used, but string is the only event type preferred.
- * @public
+ * @legacy
+ * @alpha
  */
 export type EventEmitterEventType = string;
 
 /**
- * @public
+ * @legacy
+ * @alpha
  */
 export type TypedEventTransform<TThis, TEvent> =
 	// Event emitter supports some special events for the emitter itself to use
@@ -42,14 +44,17 @@ export type TypedEventTransform<TThis, TEvent> =
 		TransformedEvent<TThis, EventEmitterEventType, any[]>;
 
 /**
- * Event Emitter helper class the supports emitting typed events
- * @public
+ * Event Emitter helper class the supports emitting typed events.
+ * @privateRemarks
+ * This should become internal once the classes extending it become internal.
+ * @legacy
+ * @alpha
  */
 export class TypedEventEmitter<TEvent>
 	extends EventEmitter
 	implements IEventProvider<TEvent & IEvent>
 {
-	constructor() {
+	public constructor() {
 		super();
 		this.addListener = super.addListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.on = super.on.bind(this) as TypedEventTransform<this, TEvent>;
@@ -65,11 +70,11 @@ export class TypedEventEmitter<TEvent>
 		this.removeListener = super.removeListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.off = super.off.bind(this) as TypedEventTransform<this, TEvent>;
 	}
-	readonly addListener: TypedEventTransform<this, TEvent>;
-	readonly on: TypedEventTransform<this, TEvent>;
-	readonly once: TypedEventTransform<this, TEvent>;
-	readonly prependListener: TypedEventTransform<this, TEvent>;
-	readonly prependOnceListener: TypedEventTransform<this, TEvent>;
-	readonly removeListener: TypedEventTransform<this, TEvent>;
-	readonly off: TypedEventTransform<this, TEvent>;
+	public readonly addListener: TypedEventTransform<this, TEvent>;
+	public readonly on: TypedEventTransform<this, TEvent>;
+	public readonly once: TypedEventTransform<this, TEvent>;
+	public readonly prependListener: TypedEventTransform<this, TEvent>;
+	public readonly prependOnceListener: TypedEventTransform<this, TEvent>;
+	public readonly removeListener: TypedEventTransform<this, TEvent>;
+	public readonly off: TypedEventTransform<this, TEvent>;
 }

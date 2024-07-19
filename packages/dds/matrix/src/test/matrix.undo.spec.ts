@@ -3,9 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { strict as assert } from "assert";
+import { strict as assert } from "node:assert";
 
 import { AttachState } from "@fluidframework/container-definitions";
+import type { IChannel } from "@fluidframework/datastore-definitions/internal";
 import {
 	MockContainerRuntimeFactory,
 	MockEmptyDeltaConnection,
@@ -13,13 +14,13 @@ import {
 	MockStorage,
 } from "@fluidframework/test-runtime-utils/internal";
 
-import { MatrixItem, SharedMatrix, SharedMatrixFactory } from "../index.js";
+import { MatrixItem, SharedMatrix, type ISharedMatrix } from "../index.js";
 
 import { TestConsumer } from "./testconsumer.js";
 import { UndoRedoStackManager } from "./undoRedoStackManager.js";
-import { expectSize, extract } from "./utils.js";
+import { expectSize, extract, matrixFactory } from "./utils.js";
 
-[false, true].forEach((isSetCellPolicyFWW: boolean) => {
+for (const isSetCellPolicyFWW of [false, true]) {
 	describe(`Matrix isSetCellPolicyFWW=${isSetCellPolicyFWW}`, () => {
 		describe("undo/redo", () => {
 			let dataStoreRuntime: MockFluidDataStoreRuntime;
@@ -29,7 +30,7 @@ import { expectSize, extract } from "./utils.js";
 			let undo1: UndoRedoStackManager;
 			let expect: <T>(expected: readonly (readonly MatrixItem<T>[])[]) => Promise<void>;
 
-			function singleClientTests() {
+			function singleClientTests(): void {
 				it("undo/redo setCell", async () => {
 					matrix1.insertRows(/* start: */ 0, /* count: */ 1);
 					matrix1.insertCols(/* start: */ 0, /* count: */ 1);
@@ -65,12 +66,7 @@ import { expectSize, extract } from "./utils.js";
 					undo1.closeCurrentOperation();
 
 					matrix1.insertRows(/* start: */ 0, /* count: */ 2);
-					matrix1.setCells(
-						/* rowStart: */ 0,
-						/* colStart: */ 0,
-						/* colCount: */ 1,
-						[0, 1],
-					);
+					matrix1.setCells(/* rowStart: */ 0, /* colStart: */ 0, /* colCount: */ 1, [0, 1]);
 					undo1.closeCurrentOperation();
 
 					await expect([[0], [1]]);
@@ -243,12 +239,7 @@ import { expectSize, extract } from "./utils.js";
 					undo1.closeCurrentOperation();
 
 					matrix1.insertCols(/* start: */ 0, /* count: */ 2);
-					matrix1.setCells(
-						/* rowStart: */ 0,
-						/* colStart: */ 0,
-						/* colCount: */ 2,
-						[0, 1],
-					);
+					matrix1.setCells(/* rowStart: */ 0, /* colStart: */ 0, /* colCount: */ 2, [0, 1]);
 					undo1.closeCurrentOperation();
 
 					await expect([[0, 1]]);
@@ -407,7 +398,9 @@ import { expectSize, extract } from "./utils.js";
 			describe("local client", () => {
 				// Summarizes the given `SharedMatrix`, loads the summary into a 2nd SharedMatrix, vets that the two are
 				// equivalent, and then returns the 2nd matrix.
-				async function summarize<T>(matrix: SharedMatrix<T>) {
+				async function summarize<T>(
+					matrix: SharedMatrix<T>,
+				): Promise<ISharedMatrix & IChannel> {
 					// Create a summary
 					const objectStorage = MockStorage.createFromSummary(
 						matrix.getAttachSummary().summary,
@@ -419,16 +412,15 @@ import { expectSize, extract } from "./utils.js";
 					});
 
 					// Load the summary into a newly created 2nd SharedMatrix.
-					const matrix2 = new SharedMatrix<T>(
+					const matrix2 = await matrixFactory.load(
 						dataStoreRuntime,
 						`load(${matrix.id})`,
-						SharedMatrixFactory.Attributes,
-						isSetCellPolicyFWW,
+						{
+							deltaConnection: new MockEmptyDeltaConnection(),
+							objectStorage,
+						},
+						matrixFactory.attributes,
 					);
-					await matrix2.load({
-						deltaConnection: new MockEmptyDeltaConnection(),
-						objectStorage,
-					});
 
 					// Vet that the 2nd matrix is equivalent to the original.
 					//
@@ -445,7 +437,9 @@ import { expectSize, extract } from "./utils.js";
 				}
 
 				before(() => {
-					expect = async <T>(expected: readonly (readonly MatrixItem<T>[])[]) => {
+					expect = async <T>(
+						expected: readonly (readonly MatrixItem<T>[])[],
+					): Promise<void> => {
 						const actual = extract(matrix1);
 						assert.deepEqual(actual, expected, "Matrix must match expected.");
 						assert.deepEqual(
@@ -458,12 +452,10 @@ import { expectSize, extract } from "./utils.js";
 
 				beforeEach("createMatrix", async () => {
 					dataStoreRuntime = new MockFluidDataStoreRuntime();
-					matrix1 = new SharedMatrix(
-						dataStoreRuntime,
-						"matrix1",
-						SharedMatrixFactory.Attributes,
-						isSetCellPolicyFWW,
-					);
+					matrix1 = matrixFactory.create(dataStoreRuntime, "matrix1");
+					if (isSetCellPolicyFWW) {
+						matrix1.switchSetCellPolicy();
+					}
 
 					// Attach a new IMatrixConsumer
 					consumer1 = new TestConsumer(matrix1);
@@ -501,7 +493,9 @@ import { expectSize, extract } from "./utils.js";
 				let containerRuntimeFactory: MockContainerRuntimeFactory;
 
 				before(() => {
-					expect = async (expected?: readonly (readonly any[])[]) => {
+					expect = async (
+						expected?: readonly (readonly MatrixItem<unknown>[])[],
+					): Promise<void> => {
 						containerRuntimeFactory.processAllMessages();
 
 						const actual1 = extract(matrix1);
@@ -528,12 +522,11 @@ import { expectSize, extract } from "./utils.js";
 
 					// Create and connect the first SharedMatrix.
 					const dataStoreRuntime1 = new MockFluidDataStoreRuntime();
-					matrix1 = new SharedMatrix(
-						dataStoreRuntime1,
-						"matrix1",
-						SharedMatrixFactory.Attributes,
-						isSetCellPolicyFWW,
-					);
+					matrix1 = matrixFactory.create(dataStoreRuntime1, "matrix1");
+					if (isSetCellPolicyFWW) {
+						matrix1.switchSetCellPolicy();
+					}
+
 					containerRuntimeFactory.createContainerRuntime(dataStoreRuntime1);
 					matrix1.connect({
 						deltaConnection: dataStoreRuntime1.createDeltaConnection(),
@@ -545,12 +538,11 @@ import { expectSize, extract } from "./utils.js";
 
 					// Create and connect the second SharedMatrix.
 					const dataStoreRuntime2 = new MockFluidDataStoreRuntime();
-					matrix2 = new SharedMatrix(
-						dataStoreRuntime2,
-						"matrix2",
-						SharedMatrixFactory.Attributes,
-						isSetCellPolicyFWW,
-					);
+					matrix2 = matrixFactory.create(dataStoreRuntime2, "matrix2");
+					if (isSetCellPolicyFWW) {
+						matrix2.switchSetCellPolicy();
+					}
+
 					containerRuntimeFactory.createContainerRuntime(dataStoreRuntime2);
 					matrix2.connect({
 						deltaConnection: dataStoreRuntime2.createDeltaConnection(),
@@ -563,6 +555,8 @@ import { expectSize, extract } from "./utils.js";
 
 				afterEach(async () => {
 					// Paranoid check that the matrices are have converged on the same state.
+					// Supressed to allow checking that the matrices are not undefined at the end of the test.
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
 					await expect(undefined as any);
 
 					matrix1.closeMatrix(consumer1);
@@ -670,6 +664,8 @@ import { expectSize, extract } from "./utils.js";
 					undo1.redoOperation();
 
 					// Only check for convergence due to GitHub issue #3964...  (See below.)
+					// Supressed to allow checking that the matrices are not undefined at the end of the test.
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
 					await expect(undefined as any);
 
 					// A known weakness of our current undo implementation is that undoing a
@@ -801,4 +797,4 @@ import { expectSize, extract } from "./utils.js";
 			});
 		});
 	});
-});
+}

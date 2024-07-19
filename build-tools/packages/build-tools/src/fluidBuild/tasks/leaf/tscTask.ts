@@ -52,6 +52,7 @@ export class TscTask extends LeafTask {
 			// `tsc -b` by design doesn't rebuild if dependent packages changed
 			// but not a referenced project. Just force it if we detected the change and
 			// invoke the build.
+			// `--force` is not fully supported, due to workaround in createTscUtil, so this may not actually work.
 			return `${this.command} --force`;
 		}
 		return this.command;
@@ -124,13 +125,20 @@ export class TscTask extends LeafTask {
 		}
 
 		const program = tsBuildInfo.program;
+		const noEmit = config.options.noEmit ?? false;
+		const hasChangedFiles = (program.changeFileSet?.length ?? 0) > 0;
+		const hasEmitErrorsOrPending =
+			(program.affectedFilesPendingEmit?.length ?? 0) > 0 ||
+			(program.emitDiagnosticsPerFile?.length ?? 0) > 0;
+		const hasSemanticErrors =
+			program.semanticDiagnosticsPerFile?.some((item) => Array.isArray(item)) ?? false;
+
+		const previousBuildError = noEmit
+			? hasChangedFiles || hasSemanticErrors
+			: hasChangedFiles || hasSemanticErrors || hasEmitErrorsOrPending;
+
 		// Check previous build errors
-		if (
-			program.changeFileSet?.length ||
-			(!config.options.noEmit
-				? program.affectedFilesPendingEmit?.length || program.emitDiagnosticsPerFile?.length
-				: program.semanticDiagnosticsPerFile?.some((item) => Array.isArray(item)))
-		) {
+		if (previousBuildError) {
 			this.traceTrigger("previous build error");
 			return false;
 		}

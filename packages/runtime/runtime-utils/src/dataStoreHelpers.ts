@@ -72,7 +72,8 @@ export function responseToException(response: IResponse, request: IRequest): Err
 }
 
 /**
- * @internal
+ * @legacy
+ * @alpha
  */
 export const create404Response = (request: IRequest) =>
 	createResponseError(404, "not found", request);
