@@ -4,15 +4,19 @@
  */
 
 import { IFluidHandle } from "@fluidframework/core-interfaces";
-import { IFluidSerializer, serializeHandles } from "@fluidframework/shared-object-base";
 import {
-	ISerializableIntervalCollection,
-	ISerializedIntervalCollection,
+	serializeHandles,
+	IFluidSerializer,
+} from "@fluidframework/shared-object-base/internal";
+
+import type { IntervalCollection } from "./intervalCollection.js";
+import {
 	IIntervalCollectionOperation,
 	IIntervalCollectionType,
+	ISerializableIntervalCollection,
+	ISerializedIntervalCollection,
 } from "./intervalCollectionMapInterfaces.js";
-import { IntervalOpType, type ISerializableInterval } from "./intervals/index.js";
-import type { IntervalCollection } from "./intervalCollection.js";
+import { type ISerializableInterval, IntervalOpType } from "./intervals/index.js";
 
 /**
  * A local value to be stored in a container type DDS.
@@ -34,7 +38,10 @@ export interface ILocalIntervalCollection<T extends ISerializableInterval> {
 	 * @param bind - Container type's handle
 	 * @returns The serialized form of the contained value
 	 */
-	makeSerialized(serializer: IFluidSerializer, bind: IFluidHandle): ISerializedIntervalCollection;
+	makeSerialized(
+		serializer: IFluidSerializer,
+		bind: IFluidHandle,
+	): ISerializedIntervalCollection;
 }
 
 export function makeSerializable<T extends ISerializableInterval>(
@@ -51,8 +58,6 @@ export function makeSerializable<T extends ISerializableInterval>(
 
 /**
  * Manages a contained value type.
- *
- * @alpha
  */
 export class IntervalCollectionTypeLocalValue<T extends ISerializableInterval>
 	implements ILocalIntervalCollection<T>

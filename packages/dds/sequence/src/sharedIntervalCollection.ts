@@ -6,23 +6,27 @@
 import { bufferToString } from "@fluid-internal/client-utils";
 import {
 	IChannelAttributes,
-	IFluidDataStoreRuntime,
-	IChannelStorageService,
-	IChannelServices,
 	IChannelFactory,
-} from "@fluidframework/datastore-definitions";
-import { ISequencedDocumentMessage, MessageType } from "@fluidframework/protocol-definitions";
-import { ISummaryTreeWithStats } from "@fluidframework/runtime-definitions";
+	IFluidDataStoreRuntime,
+	IChannelServices,
+	IChannelStorageService,
+} from "@fluidframework/datastore-definitions/internal";
 import {
-	createSingleBlobSummary,
+	MessageType,
+	ISequencedDocumentMessage,
+} from "@fluidframework/driver-definitions/internal";
+import { ISummaryTreeWithStats } from "@fluidframework/runtime-definitions/internal";
+import {
 	IFluidSerializer,
 	SharedObject,
-} from "@fluidframework/shared-object-base";
-import { Interval, ISerializableInterval } from "./intervals/index.js";
+	createSingleBlobSummary,
+} from "@fluidframework/shared-object-base/internal";
+
 import { IIntervalCollection, IntervalCollectionValueType } from "./intervalCollection.js";
-import { IntervalCollectionMap, IMapOperation } from "./intervalCollectionMap.js";
-import { pkgVersion } from "./packageVersion.js";
+import { IMapOperation, IntervalCollectionMap } from "./intervalCollectionMap.js";
 import { IMapMessageLocalMetadata } from "./intervalCollectionMapInterfaces.js";
+import { ISerializableInterval, Interval } from "./intervals/index.js";
+import { pkgVersion } from "./packageVersion.js";
 
 const snapshotFileName = "header";
 
@@ -72,6 +76,7 @@ export class SharedIntervalCollectionFactory implements IChannelFactory {
 }
 
 /**
+ * @legacy
  * @alpha
  */
 export interface ISharedIntervalCollection<TInterval extends ISerializableInterval> {

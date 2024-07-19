@@ -9,8 +9,9 @@
  * @fileoverview In this file, we will test typeid_helper functions.
  */
 
-import { expect } from "chai";
 import { constants } from "@fluid-experimental/property-common";
+import { expect } from "chai";
+
 import { TypeIdHelper } from "../../helpers/typeidHelper.js";
 
 (function () {
@@ -95,12 +96,12 @@ import { TypeIdHelper } from "../../helpers/typeidHelper.js";
 				expect(TypeIdHelper.nativeInheritsFrom("NamedProperty", "BaseProperty")).to.be.true;
 				expect(TypeIdHelper.nativeInheritsFrom("NamedNodeProperty", "BaseProperty")).to.be
 					.true;
-				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "BaseProperty")).to
-					.be.true;
-				expect(TypeIdHelper.nativeInheritsFrom("Reference<NodeProperty>", "Reference")).to
-					.be.true;
-				expect(TypeIdHelper.nativeInheritsFrom("NodeProperty", "Reference<NodeProperty>"))
-					.to.be.false;
+				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "BaseProperty")).to.be
+					.true;
+				expect(TypeIdHelper.nativeInheritsFrom("Reference<NodeProperty>", "Reference")).to.be
+					.true;
+				expect(TypeIdHelper.nativeInheritsFrom("NodeProperty", "Reference<NodeProperty>")).to
+					.be.false;
 			});
 
 			it("should recognize that the Reference<NodeProperty> inherits from BaseProperty", () => {
@@ -137,10 +138,7 @@ import { TypeIdHelper } from "../../helpers/typeidHelper.js";
 			});
 
 			it("should recognize that the NamedProperty inherits from ContainerProperty", () => {
-				const result = TypeIdHelper.nativeInheritsFrom(
-					"NamedProperty",
-					"ContainerProperty",
-				);
+				const result = TypeIdHelper.nativeInheritsFrom("NamedProperty", "ContainerProperty");
 
 				expect(result).to.be.true;
 			});
@@ -152,10 +150,7 @@ import { TypeIdHelper } from "../../helpers/typeidHelper.js";
 			});
 
 			it("should recognize that the NamedNodeProperty inherits from NamedProperty", () => {
-				const result = TypeIdHelper.nativeInheritsFrom(
-					"NamedNodeProperty",
-					"NamedProperty",
-				);
+				const result = TypeIdHelper.nativeInheritsFrom("NamedNodeProperty", "NamedProperty");
 
 				expect(result).to.be.true;
 			});
@@ -167,10 +162,10 @@ import { TypeIdHelper } from "../../helpers/typeidHelper.js";
 			});
 
 			it("should recognize that the RelationshipProperty inherits from NodeProperty and NamedProperty", () => {
-				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "NodeProperty")).to
-					.be.true;
-				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "NamedProperty")).to
-					.be.true;
+				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "NodeProperty")).to.be
+					.true;
+				expect(TypeIdHelper.nativeInheritsFrom("RelationshipProperty", "NamedProperty")).to.be
+					.true;
 			});
 		});
 	});

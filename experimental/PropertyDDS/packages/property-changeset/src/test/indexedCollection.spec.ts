@@ -2,8 +2,10 @@
  * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
  * Licensed under the MIT License.
  */
+
 import { expect } from "chai";
 import cloneDeep from "lodash/cloneDeep.js";
+
 import { ChangeSet } from "../changeset.js";
 
 describe("Indexed Collection Operations", function () {

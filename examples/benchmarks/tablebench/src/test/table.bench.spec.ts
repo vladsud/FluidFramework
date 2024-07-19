@@ -3,11 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { NodeFromSchema, SharedTree, type ITree } from "@fluidframework/tree";
-import { SharedMatrix } from "@fluidframework/matrix";
-import { benchmark, BenchmarkType, isInPerformanceTestingMode } from "@fluid-tools/benchmark";
-import { IChannel } from "@fluidframework/datastore-definitions";
-import { generateTable, Table } from "../index.js";
+import { BenchmarkType, benchmark, isInPerformanceTestingMode } from "@fluid-tools/benchmark";
+import { IChannel } from "@fluidframework/datastore-definitions/internal";
+import { SharedMatrix } from "@fluidframework/matrix/internal";
+import { type ITree, NodeFromSchema, TreeViewConfiguration } from "@fluidframework/tree";
+import { SharedTree } from "@fluidframework/tree/internal";
+
+import { Table, generateTable } from "../index.js";
+
 import { create, measureAttachmentSummary, measureEncodedLength } from "./utils.js";
 
 const numRows = isInPerformanceTestingMode ? 10000 : 100;
@@ -69,13 +72,10 @@ describe("Table", () => {
 			title: `SharedTree`,
 			before: () => {
 				({ channel, processAllMessages } = create(SharedTree.getFactory()));
-				const tree = channel as ITree;
+				const tree = channel as unknown as ITree;
 
-				const view = tree.schematize({
-					schema: Table,
-					initialTree: () => data,
-				});
-
+				const view = tree.viewWith(new TreeViewConfiguration({ schema: Table }));
+				view.initialize(data);
 				table = view.root;
 
 				processAllMessages();
@@ -136,20 +136,22 @@ describe("Table", () => {
 				// Writing directly to 'process.stdout' bypasses this suppression.
 				process.stdout.write(`          Summary: ${summaryBytes} bytes\n`);
 				process.stdout.write(
-					`              vs row-major: ${(
-						summaryBytes / rowMajorJsonBytes
-					).toLocaleString(undefined, {
-						maximumFractionDigits: 2,
-						minimumFractionDigits: 2,
-					})}x\n`,
+					`              vs row-major: ${(summaryBytes / rowMajorJsonBytes).toLocaleString(
+						undefined,
+						{
+							maximumFractionDigits: 2,
+							minimumFractionDigits: 2,
+						},
+					)}x\n`,
 				);
 				process.stdout.write(
-					`              vs col-major: ${(
-						summaryBytes / colMajorJsonBytes
-					).toLocaleString(undefined, {
-						maximumFractionDigits: 2,
-						minimumFractionDigits: 2,
-					})}x\n`,
+					`              vs col-major: ${(summaryBytes / colMajorJsonBytes).toLocaleString(
+						undefined,
+						{
+							maximumFractionDigits: 2,
+							minimumFractionDigits: 2,
+						},
+					)}x\n`,
 				);
 			});
 
@@ -185,12 +187,10 @@ describe("Table", () => {
 
 			it("SharedTree", () => {
 				const { channel, processAllMessages } = create(SharedTree.getFactory());
-				tree = channel as ITree;
+				tree = channel;
 
-				tree.schematize({
-					schema: Table,
-					initialTree: () => data,
-				});
+				const view = tree.viewWith(new TreeViewConfiguration({ schema: Table }));
+				view.initialize(data);
 
 				processAllMessages();
 				summaryBytes = measureAttachmentSummary(channel);
