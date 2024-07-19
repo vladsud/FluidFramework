@@ -13,9 +13,9 @@ import {
 	ISummaryTreeWithStats,
 } from "@fluidframework/runtime-definitions";
 import { createSingleBlobSummary } from "@fluidframework/shared-object-base";
-import { readAndParse } from "@fluidframework/driver-utils";
+import { readAndParse } from "@fluidframework/driver-utils/internal";
 import { FluidObject, IFluidHandle, IRequest, IResponse } from "@fluidframework/core-interfaces";
-import { type ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
+import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
 import { FluidObjectHandle } from "@fluidframework/datastore";
 import { AttachState } from "@fluidframework/container-definitions";
 

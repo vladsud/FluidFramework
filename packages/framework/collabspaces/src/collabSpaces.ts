@@ -5,7 +5,7 @@
 
 import { assert } from "@fluidframework/core-utils";
 import { IRequest, IResponse } from "@fluidframework/core-interfaces";
-import { ISequencedDocumentMessage } from "@fluidframework/protocol-definitions";
+import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
 
 import {
 	ISummaryTreeWithStats,
@@ -23,7 +23,7 @@ import {
 } from "@fluidframework/matrix";
 import { UsageError } from "@fluidframework/telemetry-utils";
 import { addBlobToSummary, encodeCompactIdToString } from "@fluidframework/runtime-utils";
-import { readAndParse } from "@fluidframework/driver-utils";
+import { readAndParse } from "@fluidframework/driver-utils/internal";
 import {
 	ChannelCollection,
 	LocalFluidDataStoreContextBase,
