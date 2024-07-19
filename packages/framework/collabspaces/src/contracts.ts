@@ -2,14 +2,14 @@
  * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
  * Licensed under the MIT License.
  */
-import { Serializable } from "@fluidframework/datastore-definitions";
+import { Serializable } from "@fluidframework/datastore-definitions/internal";
 import {
 	IFluidDataStoreChannel,
 	IFluidDataStoreFactory,
 	IFluidDataStoreContext,
-} from "@fluidframework/runtime-definitions";
+} from "@fluidframework/runtime-definitions/internal";
 
-import { ISharedMatrix, MatrixItem } from "@fluidframework/matrix";
+import { ISharedMatrix, MatrixItem } from "@fluidframework/matrix/internal";
 
 /**
  * Interface for internal communication
@@ -69,7 +69,7 @@ export type CollabSpaceCellType = MatrixItem<MatrixExternalType>;
 
 /** @internal */
 export interface IEfficientMatrix
-	extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once"> {
+	extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once" | "setCells" | "isSetCellConflictResolutionPolicyFWW" | "switchSetCellPolicy"> {
 	// Semantics of this operation differ substantially from regular matrix.
 	// This will overwrite the value of the cell, thus creating a new collab channel (in the future)
 	// Usually used to change cell type to a different type.

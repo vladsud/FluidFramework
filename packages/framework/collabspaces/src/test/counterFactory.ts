@@ -3,16 +3,20 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils";
-import { SharedCounter } from "@fluidframework/counter";
-import { type IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions";
-import { DataObject, DataObjectFactory, IDataObjectProps } from "@fluidframework/aqueduct";
+import { assert } from "@fluidframework/core-utils/internal";
+import { SharedCounter } from "@fluidframework/counter/internal";
+import { type IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions/internal";
+import {
+	DataObject,
+	DataObjectFactory,
+	IDataObjectProps,
+} from "@fluidframework/aqueduct/internal";
 import {
 	IFluidDataStoreContext,
 	IFluidDataStoreChannel,
-} from "@fluidframework/runtime-definitions";
+} from "@fluidframework/runtime-definitions/internal";
 
-import { ICollabChannel, ICollabChannelFactory } from "../contracts";
+import { ICollabChannel, ICollabChannelFactory } from "../contracts.js";
 
 export interface ISharedCounter extends ICollabChannel {
 	value: number;

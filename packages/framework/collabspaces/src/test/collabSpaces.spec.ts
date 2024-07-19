@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert, delay } from "@fluidframework/core-utils";
+import { assert, delay } from "@fluidframework/core-utils/internal";
 import { type FluidObject } from "@fluidframework/core-interfaces";
 import {
 	ITestObjectProvider,
@@ -12,21 +12,25 @@ import {
 	TestObjectProvider,
 	summarizeNow,
 	createSummarizerCore,
-} from "@fluidframework/test-utils";
-import { BaseContainerRuntimeFactory } from "@fluidframework/aqueduct";
-import { AttachState, IContainer, IHostLoader } from "@fluidframework/container-definitions";
+} from "@fluidframework/test-utils/internal";
+import { BaseContainerRuntimeFactory } from "@fluidframework/aqueduct/internal";
+import {
+	AttachState,
+	IContainer,
+	IHostLoader,
+} from "@fluidframework/container-definitions/internal";
 import {
 	IContainerRuntimeOptions,
 	ISummarizer,
 	ISummaryRuntimeOptions,
 	SummaryCollection,
-} from "@fluidframework/container-runtime";
-import { type IFluidDataStoreFactory } from "@fluidframework/runtime-definitions";
+} from "@fluidframework/container-runtime/internal";
+import { type IFluidDataStoreFactory } from "@fluidframework/runtime-definitions/internal";
 import { LocalServerTestDriver } from "@fluid-private/test-drivers";
-import { Loader } from "@fluidframework/container-loader";
-import { createChildLogger } from "@fluidframework/telemetry-utils";
-import { IRevertible } from "@fluidframework/matrix";
-import { type IContainerRuntime } from "@fluidframework/container-runtime-definitions";
+import { Loader } from "@fluidframework/container-loader/internal";
+import { createChildLogger } from "@fluidframework/telemetry-utils/internal";
+import { IRevertible } from "@fluidframework/matrix/internal";
+import { type IContainerRuntime } from "@fluidframework/container-runtime-definitions/internal";
 
 import {
 	CollabSpaceCellType,
@@ -35,10 +39,10 @@ import {
 	SaveResult,
 	type IInternalChannel,
 	getCollabValue,
-} from "../contracts";
+} from "../contracts.js";
 import { createCollabSpaces } from "../factory";
 
-import { TestDataObject, ISharedCounter } from "./counterFactory";
+import { TestDataObject, ISharedCounter } from "./counterFactory.js";
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 

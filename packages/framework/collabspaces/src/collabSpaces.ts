@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils";
+import { assert } from "@fluidframework/core-utils/internal";
 import { IRequest, IResponse } from "@fluidframework/core-interfaces";
 import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
 
@@ -14,21 +14,24 @@ import {
 	IFluidDataStoreChannel,
 	NamedFluidDataStoreRegistryEntries,
 	FluidDataStoreRegistryEntry,
-} from "@fluidframework/runtime-definitions";
+} from "@fluidframework/runtime-definitions/internal";
 import {
 	SharedMatrix,
 	SharedMatrixFactory,
 	MatrixItem,
 	IUndoConsumer,
-} from "@fluidframework/matrix";
-import { UsageError } from "@fluidframework/telemetry-utils";
-import { addBlobToSummary, encodeCompactIdToString } from "@fluidframework/runtime-utils";
+} from "@fluidframework/matrix/internal";
+import { UsageError } from "@fluidframework/telemetry-utils/internal";
+import {
+	addBlobToSummary,
+	encodeCompactIdToString,
+} from "@fluidframework/runtime-utils/internal";
 import { readAndParse } from "@fluidframework/driver-utils/internal";
 import {
 	ChannelCollection,
 	LocalFluidDataStoreContextBase,
 	LocalFluidDataStoreContext,
-} from "@fluidframework/container-runtime";
+} from "@fluidframework/container-runtime/internal";
 import { AttachState } from "@fluidframework/container-definitions";
 import { IMatrixConsumer, IMatrixReader, IMatrixProducer } from "@tiny-calc/nano";
 
@@ -42,9 +45,9 @@ import {
 	SaveResult,
 	getCollabValue,
 	getCollabChannel,
-} from "./contracts";
-import { DeferredChannel } from "./deferreChannel";
-import { ReverseMap, ReverseMapType } from "./reverseMap";
+} from "./contracts.js";
+import { DeferredChannel } from "./deferreChannel.js";
+import { ReverseMap, ReverseMapType } from "./reverseMap.js";
 import { MatrixDataStoreFactory } from "./factory.js";
 
 /*
@@ -769,9 +772,9 @@ export class CollabSpacesRuntime
 	} {
 		const parts = channelId.split(",");
 		assert(parts.length === 3, "Invalid channel Id");
-		const rowId = parts[0];
-		const colId = parts[1];
-		const iteration = parts[2];
+		const rowId = parts[0] as string;
+		const colId = parts[1] as string;
+		const iteration = parts[2] as string;
 		return { rowId, colId, iteration };
 	}
 

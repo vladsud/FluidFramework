@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils";
+import { assert } from "@fluidframework/core-utils/internal";
 import {
 	IFluidDataStoreContext,
 	ITelemetryContext,
@@ -11,20 +11,20 @@ import {
 	IInboundSignalMessage,
 	IFluidDataStoreChannel,
 	ISummaryTreeWithStats,
-} from "@fluidframework/runtime-definitions";
-import { createSingleBlobSummary } from "@fluidframework/shared-object-base";
+} from "@fluidframework/runtime-definitions/internal";
+import { createSingleBlobSummary } from "@fluidframework/shared-object-base/internal";
 import { readAndParse } from "@fluidframework/driver-utils/internal";
 import {
 	FluidObject,
-	IFluidHandle,
+	IFluidHandleInternal,
 	IRequest,
 	IResponse,
-} from "@fluidframework/core-interfaces";
+} from "@fluidframework/core-interfaces/internal";
 import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
-import { FluidObjectHandle } from "@fluidframework/datastore";
+import { FluidObjectHandle } from "@fluidframework/datastore/internal";
 import { AttachState } from "@fluidframework/container-definitions";
 
-import { ICollabChannelFactory } from "./contracts";
+import { ICollabChannelFactory } from "./contracts.js";
 
 const snapshotFileName = "header";
 
@@ -37,7 +37,7 @@ export class DeferredChannel implements IFluidDataStoreChannel {
 
 	private ops: ISequencedDocumentMessage[] = [];
 
-	public readonly entryPoint: IFluidHandle<FluidObject>;
+	public readonly entryPoint: IFluidHandleInternal<FluidObject>;
 	public get id() {
 		return this.dataStoreContext.id;
 	}
@@ -72,8 +72,10 @@ export class DeferredChannel implements IFluidDataStoreChannel {
 		assert(false, "should not be called");
 	}
 
-	// TBD(PRI2): Implement?
-	// getAttachGCData?(telemetryContext?: ITelemetryContext): IGarbageCollectionData;
+	// TBD(PRI0): NYI
+	getAttachGCData(telemetryContext?: ITelemetryContext): IGarbageCollectionData {
+		throw new Error("NYI");
+	}
 
 	// TBD(PRI2): Implement?
 	public async getGCData(fullGC?: boolean): Promise<IGarbageCollectionData> {

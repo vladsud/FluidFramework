@@ -9,17 +9,17 @@ import {
 	NamedFluidDataStoreRegistryEntries,
 	IFluidDataStoreContext,
 	NamedFluidDataStoreRegistryEntry,
-} from "@fluidframework/runtime-definitions";
+} from "@fluidframework/runtime-definitions/internal";
 import {
 	ChannelCollectionFactory,
 	ChannelCollection,
-} from "@fluidframework/container-runtime";
-import { FluidDataStoreRuntime } from "@fluidframework/datastore";
+} from "@fluidframework/container-runtime/internal";
+import { FluidDataStoreRuntime } from "@fluidframework/datastore/internal";
 import {
 	IChannelFactory,
 	IFluidDataStoreRuntime,
-} from "@fluidframework/datastore-definitions";
-import { SharedMatrixFactory, SharedMatrix } from "@fluidframework/matrix";
+} from "@fluidframework/datastore-definitions/internal";
+import { SharedMatrixFactory, SharedMatrix } from "@fluidframework/matrix/internal";
 import { DeferredChannelFactory } from "./deferreChannel.js";
 
 // import { DeferredChannel, DeferredChannelFactory } from "./deferreChannel";

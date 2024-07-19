@@ -13,5 +13,5 @@ export {
 	IInternalChannel,
 	getCollabValue,
 	getCollabChannel,
-} from "./contracts";
-export { createCollabSpaces } from "./factory";
+} from "./contracts.js";
+export { createCollabSpaces } from "./factory.js";

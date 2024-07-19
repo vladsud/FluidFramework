@@ -12,7 +12,6 @@ import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import {
 	IChannelAttributes,
 	IFluidDataStoreRuntime,
-	type IChannel,
 	IChannelStorageService,
 } from "@fluidframework/datastore-definitions/internal";
 import { ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
@@ -128,8 +127,7 @@ export interface ISharedMatrix<T = any>
 	extends IEventProvider<ISharedMatrixEvents<T>>,
 		IMatrixProducer<MatrixItem<T>>,
 		IMatrixReader<MatrixItem<T>>,
-		IMatrixWriter<MatrixItem<T>>,
-		IChannel {
+		IMatrixWriter<MatrixItem<T>> {
 	/**
 	 * Inserts columns into the matrix.
 	 * @param colStart - Index of the first column to insert.
