@@ -13,7 +13,11 @@ export interface IRevertible {
 }
 
 // @alpha (undocumented)
-export interface ISharedMatrix<T = any> extends IEventProvider<ISharedMatrixEvents<T>>, IMatrixProducer<MatrixItem<T>>, IMatrixReader<MatrixItem<T>>, IMatrixWriter<MatrixItem<T>>, IChannel {
+export interface ISharedMatrix<T = any> extends IEventProvider<ISharedMatrixEvents<T>>, ISharedMatrixCore, IChannel {
+}
+
+// @alpha (undocumented)
+export interface ISharedMatrixCore<T = any> extends IMatrixProducer<MatrixItem<T>>, IMatrixReader<MatrixItem<T>>, IMatrixWriter<MatrixItem<T>> {
     insertCols(colStart: number, count: number): void;
     insertRows(rowStart: number, count: number): void;
     isSetCellConflictResolutionPolicyFWW(): boolean;

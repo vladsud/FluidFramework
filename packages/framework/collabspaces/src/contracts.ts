@@ -9,7 +9,7 @@ import {
 	IFluidDataStoreContext,
 } from "@fluidframework/runtime-definitions/internal";
 
-import { ISharedMatrix, MatrixItem } from "@fluidframework/matrix/internal";
+import { ISharedMatrixCore, MatrixItem } from "@fluidframework/matrix/internal";
 
 /**
  * Interface for internal communication
@@ -69,7 +69,10 @@ export type CollabSpaceCellType = MatrixItem<MatrixExternalType>;
 
 /** @internal */
 export interface IEfficientMatrix
-	extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once" | "setCells" | "isSetCellConflictResolutionPolicyFWW" | "switchSetCellPolicy"> {
+	extends Omit<
+		ISharedMatrixCore<MatrixExternalType>,
+		"on" | "off" | "once" | "getCell" | "setCells"
+	> {
 	// Semantics of this operation differ substantially from regular matrix.
 	// This will overwrite the value of the cell, thus creating a new collab channel (in the future)
 	// Usually used to change cell type to a different type.
@@ -79,9 +82,6 @@ export interface IEfficientMatrix
 	// Old channel could come back to life (become again rooted / associated with cell) through undo!
 	setCell(rowArg: number, colArg: number, value: CollabSpaceCellType);
 
-	// TBD(Pri2) - need to get rid of synchronous version, as I do not think we can deliver it.
-	// Removing it causes a bunch of type issues, so leaving NYI version for now.
-	getCell(row: number, col: number): CollabSpaceCellType;
 	getCellAsync(row: number, col: number): Promise<CollabSpaceCellType>;
 
 	// Returns collab channel that is associated with a cell. Type of the channel depeds on type of cell
@@ -122,7 +122,7 @@ export interface IEfficientMatrixTest {
 	getCellDebugInfo(
 		row: number,
 		col: number,
-	): Promise<{ channel?: IInternalChannel; rowId: string; colId: string }>;
+	): Promise<{ channel: IInternalChannel | undefined; rowId: string; colId: string }>;
 
 	getReverseMapsDebugInfo(): Readonly<{
 		rowMap: { [id: string]: number };

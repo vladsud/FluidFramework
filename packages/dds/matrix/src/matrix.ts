@@ -6,11 +6,11 @@
 import {
 	IEvent,
 	IEventThisPlaceHolder,
-	type IEventProvider,
 } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import {
 	IChannelAttributes,
+	type IChannel,
 	IFluidDataStoreRuntime,
 	IChannelStorageService,
 } from "@fluidframework/datastore-definitions/internal";
@@ -34,6 +34,7 @@ import {
 import {
 	IFluidSerializer,
 	ISharedObjectEvents,
+	ISharedObject,
 	SharedObject,
 } from "@fluidframework/shared-object-base/internal";
 import { UsageError } from "@fluidframework/telemetry-utils/internal";
@@ -123,9 +124,8 @@ interface CellLastWriteTrackerItem {
 // Changing this to `unknown` would be a breaking change.
 // TODO: if possible, transition ISharedMatrix to not use `any`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface ISharedMatrix<T = any>
-	extends IEventProvider<ISharedMatrixEvents<T>>,
-		IMatrixProducer<MatrixItem<T>>,
+export interface ISharedMatrixCore<T = any>
+	extends	IMatrixProducer<MatrixItem<T>>,
 		IMatrixReader<MatrixItem<T>>,
 		IMatrixWriter<MatrixItem<T>> {
 	/**
@@ -185,7 +185,20 @@ export interface ISharedMatrix<T = any>
 	 * @param consumer - Undo consumer which will receive revertibles from the matrix.
 	 */
 	openUndo(consumer: IUndoConsumer): void;
+}
 
+/**
+ * @legacy
+ * @alpha
+ */
+// Changing this to `unknown` would be a breaking change.
+// TODO: if possible, transition ISharedMatrix to not use `any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface ISharedMatrix<T = any>
+	extends
+		ISharedObject<ISharedMatrixEvents<T> & ISharedObjectEvents>,
+		ISharedMatrixCore<T>,
+		IChannel {
 	/**
 	 * Whether the current conflict resolution policy is first-write win (FWW).
 	 * See {@link ISharedMatrix.switchSetCellPolicy} for more details.

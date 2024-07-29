@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-export { ISharedMatrixEvents, ISharedMatrix } from "./matrix.js";
+export { ISharedMatrixEvents, ISharedMatrix, ISharedMatrixCore } from "./matrix.js";
 export { MatrixItem } from "./ops.js";
 export { SharedMatrixFactory, SharedMatrix } from "./runtime.js";
 

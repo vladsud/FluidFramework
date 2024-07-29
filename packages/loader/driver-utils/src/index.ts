@@ -43,7 +43,7 @@ export {
 } from "./parallelRequests.js";
 export { PrefetchDocumentStorageService } from "./prefetchDocumentStorageService.js";
 export { RateLimiter } from "./rateLimiter.js";
-export { readAndParse } from "./readAndParse.js";
+export { readAndParse, readAndParse2 } from "./readAndParse.js";
 export { calculateMaxWaitTime, IProgress, runWithRetry } from "./runWithRetry.js";
 export {
 	CombinedAppAndProtocolSummary,

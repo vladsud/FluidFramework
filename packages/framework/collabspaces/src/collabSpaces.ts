@@ -26,10 +26,9 @@ import {
 	addBlobToSummary,
 	encodeCompactIdToString,
 } from "@fluidframework/runtime-utils/internal";
-import { readAndParse } from "@fluidframework/driver-utils/internal";
+import { readAndParse2 } from "@fluidframework/driver-utils/internal";
 import {
 	ChannelCollection,
-	LocalFluidDataStoreContextBase,
 	LocalFluidDataStoreContext,
 } from "@fluidframework/container-runtime/internal";
 import { AttachState } from "@fluidframework/container-definitions";
@@ -147,6 +146,12 @@ interface MatrixInternalType extends MatrixExternalType {
 	seq: number;
 }
 
+interface ICellInfoCore {
+	row: number;
+	col: number;
+	iteration: uuidType;
+}
+
 type ICellInfo = {
 	rowId: string;
 	colId: string;
@@ -207,7 +212,7 @@ export async function getInternalChannel(
 	};
 }
 
-class SpecialLocalContext extends LocalFluidDataStoreContextBase {
+class SpecialLocalContext extends LocalFluidDataStoreContext {
 	constructor(props) {
 		super(props);
 		assert(this.pkg !== undefined, 0x14a /* "Undefined package path" */);
@@ -499,13 +504,12 @@ export class CollabSpacesRuntime
 			]).realize();
 			channel.makeVisibleAndAttachGraph();
 		} else {
-			assert(this.baseSnapshot !== undefined, "loading from snasphot");
-			const blobId = this.baseSnapshot.blobs[channelSummaryBlobName];
-			assert(blobId !== undefined, "channelInfo not present");
-			this.channelInfo = await readAndParse<Record<string, IChannelTrackingInfo>>(
+			assert(this.baseSnapshot !== undefined, "loading from snapshot");
+			this.channelInfo = (await readAndParse2(
+				channelSummaryBlobName,
+				this.baseSnapshot,
 				this.parentContext.storage,
-				blobId,
-			);
+			)) as Record<string, IChannelTrackingInfo>;
 		}
 
 		this.matrixInternal = (await (
@@ -660,7 +664,7 @@ export class CollabSpacesRuntime
 	public async getCellDebugInfo(
 		row: number,
 		col: number,
-	): Promise<{ channel?: IInternalChannel; rowId: string; colId: string }> {
+	): Promise<{ channel: IInternalChannel | undefined; rowId: string; colId: string }> {
 		const result = this.getCellInfo(row, col);
 		const channel =
 			result.channel !== undefined
@@ -736,6 +740,8 @@ export class CollabSpacesRuntime
 			[value.type], // pkg
 			SpecialLocalContext,
 		);
+
+		// IFluidDataStoreContextInternal, LocalFluidDataStoreContext,
 
 		const factoryP = this.getFactoryForValueType(value.type);
 		assert(factoryP !== undefined, "Factory is missing for matrix type");
@@ -836,15 +842,15 @@ export class CollabSpacesRuntime
 		return { row, col };
 	}
 
-	private mapChannelToCellCore(channelId: string) {
+	private mapChannelToCellCore(channelId: string): ICellInfoCore | undefined {
 		const { rowId, colId, iteration } = this.parseChannelId(channelId);
-		if (this.useReverseMapping) {
-			const result = this.getMatrixCellRowColUsingReverseMapping(rowId, colId);
-			return { row: result?.row, col: result?.col, iteration };
-		} else {
-			const result = this.getMatrixCellRowCol(rowId, colId);
-			return { row: result?.row, col: result?.col, iteration };
+		const result = this.useReverseMapping
+			? this.getMatrixCellRowColUsingReverseMapping(rowId, colId)
+			: this.getMatrixCellRowCol(rowId, colId);
+		if (result === undefined) {
+			return undefined;
 		}
+		return { ...result, iteration };
 	}
 
 	private mapChannelToCell(channelId: string) {

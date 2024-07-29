@@ -4,14 +4,6 @@
 
 ```ts
 
-import { IFluidDataStoreChannel } from '@fluidframework/runtime-definitions';
-import { IFluidDataStoreContext } from '@fluidframework/runtime-definitions';
-import { IFluidDataStoreFactory } from '@fluidframework/runtime-definitions';
-import { ISharedMatrix } from '@fluidframework/matrix';
-import { MatrixItem } from '@fluidframework/matrix';
-import { NamedFluidDataStoreRegistryEntries } from '@fluidframework/runtime-definitions';
-import { Serializable } from '@fluidframework/datastore-definitions';
-
 // @internal (undocumented)
 export type CollabSpaceCellType = MatrixItem<MatrixExternalType>;
 
@@ -39,7 +31,7 @@ export interface ICollabChannelFactory extends IFluidDataStoreFactory {
 }
 
 // @internal (undocumented)
-export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>, "getCell" | "on" | "off" | "once"> {
+export interface IEfficientMatrix extends Omit<ISharedMatrixCore<MatrixExternalType>, "on" | "off" | "once" | "getCell" | "setCells"> {
     // (undocumented)
     destroyCellChannel(channel: IInternalChannel): boolean;
     // (undocumented)
@@ -47,8 +39,6 @@ export interface IEfficientMatrix extends Omit<ISharedMatrix<MatrixExternalType>
         rooted: IInternalChannel[];
         notRooted: IInternalChannel[];
     }>;
-    // (undocumented)
-    getCell(row: number, col: number): CollabSpaceCellType;
     // (undocumented)
     getCellAsync(row: number, col: number): Promise<CollabSpaceCellType>;
     // (undocumented)
@@ -80,13 +70,13 @@ export interface MatrixExternalType {
 // @internal (undocumented)
 export enum SaveResult {
     // (undocumented)
-    CantSave = 2,
+    CantSave = 2,// Channel is dirty, not saved
     // (undocumented)
-    Dirty = 0,
+    Dirty = 0,// Channel is not rooted, not saved
     // (undocumented)
-    NoNeedToSave = 3,
+    NoNeedToSave = 3,// Can't save as need to process more ops
     // (undocumented)
-    NotRooted = 1,
+    NotRooted = 1,// channel is already saved, no need to save
     // (undocumented)
     Saved = 4
 }

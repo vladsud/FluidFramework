@@ -40,7 +40,7 @@ import {
 	type IInternalChannel,
 	getCollabValue,
 } from "../contracts.js";
-import { createCollabSpaces } from "../factory";
+import { createCollabSpaces } from "../factory.js";
 
 import { TestDataObject, ISharedCounter } from "./counterFactory.js";
 
