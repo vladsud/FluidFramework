@@ -3,10 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import {
-	IEvent,
-	IEventThisPlaceHolder,
-} from "@fluidframework/core-interfaces";
+import { IEvent, IEventThisPlaceHolder } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import {
 	IChannelAttributes,
@@ -125,7 +122,7 @@ interface CellLastWriteTrackerItem {
 // TODO: if possible, transition ISharedMatrix to not use `any`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ISharedMatrixCore<T = any>
-	extends	IMatrixProducer<MatrixItem<T>>,
+	extends IMatrixProducer<MatrixItem<T>>,
 		IMatrixReader<MatrixItem<T>>,
 		IMatrixWriter<MatrixItem<T>> {
 	/**
@@ -195,8 +192,7 @@ export interface ISharedMatrixCore<T = any>
 // TODO: if possible, transition ISharedMatrix to not use `any`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ISharedMatrix<T = any>
-	extends
-		ISharedObject<ISharedMatrixEvents<T> & ISharedObjectEvents>,
+	extends ISharedObject<ISharedMatrixEvents<T> & ISharedObjectEvents>,
 		ISharedMatrixCore<T>,
 		IChannel {
 	/**

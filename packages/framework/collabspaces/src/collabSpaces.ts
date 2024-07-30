@@ -506,9 +506,8 @@ export class CollabSpacesRuntime
 			)) as Record<string, IChannelTrackingInfo>;
 		}
 
-		this.matrixInternal = (await (
-			await this.contexts.get(matrixId)?.realize()
-		)?.entryPoint.get()) as SharedMatrix;
+		const channel = await this.contexts.get(matrixId)?.realize();
+		this.matrixInternal = (await channel?.entryPoint.get()) as SharedMatrix;
 
 		// Rebuild deferred channels
 		this.deferredChannels = new Map();
