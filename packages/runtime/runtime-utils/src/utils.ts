@@ -74,7 +74,17 @@ export function encodeCompactIdToString(idArg: number | string, prefix = "") {
 		// 10000 -> 'BaQ'
 		// 100000 -> 'XZf'
 		const encode = num % 64;
-		const base = encode < 27 ? 65 : encode < 54 ? 97 - 27 : 48 - 54;
+		const base =
+			encode < 26
+				? 65
+				: //  0-25 -> A-Z
+					encode < 52
+					? 97 - 26
+					: // 26-51 -> a-z
+						encode < 62
+						? 48 - 52
+						: // 52-61 -> 0-9
+							40 - 62; // 62-63 -> ()
 		id = String.fromCharCode(base + encode) + id;
 		num = Math.floor(num / 64) - 1;
 	} while (num !== -1);

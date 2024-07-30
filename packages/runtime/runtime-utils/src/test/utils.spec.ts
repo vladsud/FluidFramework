@@ -16,11 +16,15 @@ describe("Utils", () => {
 	});
 
 	it("encodeCompactIdToString() has base of 64 (sort of)", () => {
-		const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ[abcdefghijklmnopqrstuvwxyz{01234567890";
+		const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789()";
 		for (let i = 0; i < 64; i++) {
 			const value = encodeCompactIdToString(i);
 			assert(value.length === 1, "length");
 			assert(chars[i] === value, "value");
+			// Prefer to use IDs that are not changing their shape due to URI encoding.
+			// This is to avoid (already fixed) bug in ODSP driver that was encoding IDs in summaries
+			// but never decoded them when loading snapshots.
+			assert(encodeURIComponent(value) === value);
 		}
 
 		for (let i = 64; i < 65 * 64 - 1; i++) {
@@ -34,11 +38,11 @@ describe("Utils", () => {
 		// That's because in base10 system we do not use "01" form - leading 0 is not used.
 		// Here, because we use forms like 01, 001, 011, we can put more numbers into less chars.
 		assert(encodeCompactIdToString(64) === "AA", "AA");
-		assert(encodeCompactIdToString(64 * 64) === "9A", "9A");
-		assert(encodeCompactIdToString(64 * 64 * 64) === "89A", "89A");
-		assert(encodeCompactIdToString(64 * 64 * 64 * 64) === "889A", "889A"); // 16M!
-		assert(encodeCompactIdToString(64 * 64 * 64 * 64 * 64) === "8889A", "8889A"); // 1G (~10^9)
-		assert(encodeCompactIdToString(64 * 64 * 64 * 64 * 64 * 64) === "88889A", "88889A");
+		assert(encodeCompactIdToString(64 * 64) === ")A", ")A");
+		assert(encodeCompactIdToString(64 * 64 * 64) === "()A", "()A");
+		assert(encodeCompactIdToString(64 * 64 * 64 * 64) === "(()A", "(()A"); // 16M!
+		assert(encodeCompactIdToString(64 * 64 * 64 * 64 * 64) === "((()A", "((()A"); // 1G (~10^9)
+		assert(encodeCompactIdToString(64 * 64 * 64 * 64 * 64 * 64) === "(((()A", "(((()A");
 	});
 
 	it("encodeCompactIdToString() generates Unique values", () => {
