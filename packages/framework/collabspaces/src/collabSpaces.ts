@@ -3,10 +3,16 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils/internal";
+import { AttachState } from "@fluidframework/container-definitions";
+import {
+	ChannelCollection,
+	LocalFluidDataStoreContext,
+} from "@fluidframework/container-runtime/internal";
 import { IRequest, IResponse } from "@fluidframework/core-interfaces";
+import { assert } from "@fluidframework/core-utils/internal";
 import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
-
+import { readAndParse2 } from "@fluidframework/driver-utils/internal";
+import { SharedMatrix, MatrixItem, IUndoConsumer } from "@fluidframework/matrix/internal";
 import {
 	ISummaryTreeWithStats,
 	ITelemetryContext,
@@ -16,22 +22,10 @@ import {
 	FluidDataStoreRegistryEntry,
 } from "@fluidframework/runtime-definitions/internal";
 import {
-	SharedMatrix,
-	SharedMatrixFactory,
-	MatrixItem,
-	IUndoConsumer,
-} from "@fluidframework/matrix/internal";
-import { UsageError } from "@fluidframework/telemetry-utils/internal";
-import {
 	addBlobToSummary,
 	encodeCompactIdToString,
 } from "@fluidframework/runtime-utils/internal";
-import { readAndParse2 } from "@fluidframework/driver-utils/internal";
-import {
-	ChannelCollection,
-	LocalFluidDataStoreContext,
-} from "@fluidframework/container-runtime/internal";
-import { AttachState } from "@fluidframework/container-definitions";
+import { UsageError } from "@fluidframework/telemetry-utils/internal";
 import { IMatrixConsumer, IMatrixReader, IMatrixProducer } from "@tiny-calc/nano";
 
 import {
@@ -46,8 +40,8 @@ import {
 	getCollabChannel,
 } from "./contracts.js";
 import { DeferredChannel } from "./deferreChannel.js";
-import { ReverseMap, ReverseMapType } from "./reverseMap.js";
 import { MatrixDataStoreFactory } from "./factory.js";
+import { ReverseMap, ReverseMapType } from "./reverseMap.js";
 
 /*
  * This is a prototype, an implementation of sparse matrix that natively supports collaboration.
@@ -705,7 +699,7 @@ export class CollabSpacesRuntime
 	// eslint-disable-next-line @typescript-eslint/promise-function-async
 	private getFactoryForValueType(type: string) {
 		// Matrix is in the list of channels, but it's "internal" type - not allowed to be used in cells.
-		if (type === SharedMatrixFactory.Type) {
+		if (type === MatrixDataStoreFactory.type) {
 			return undefined;
 		}
 		const factoryP = this.registry.get(type);
@@ -778,9 +772,9 @@ export class CollabSpacesRuntime
 	} {
 		const parts = channelId.split(",");
 		assert(parts.length === 3, "Invalid channel Id");
-		const rowId = parts[0] as string;
-		const colId = parts[1] as string;
-		const iteration = parts[2] as string;
+		const rowId = parts[0];
+		const colId = parts[1];
+		const iteration = parts[2];
 		return { rowId, colId, iteration };
 	}
 

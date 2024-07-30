@@ -3,14 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils/internal";
-import { SharedCounter } from "@fluidframework/counter/internal";
-import { type IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions/internal";
 import {
 	DataObject,
 	DataObjectFactory,
 	IDataObjectProps,
 } from "@fluidframework/aqueduct/internal";
+import { assert } from "@fluidframework/core-utils/internal";
+import { SharedCounter } from "@fluidframework/counter/internal";
+import { type IFluidDataStoreRuntime } from "@fluidframework/datastore-definitions/internal";
 import {
 	IFluidDataStoreContext,
 	IFluidDataStoreChannel,
@@ -68,12 +68,7 @@ export class TestDataObject extends DataObject implements ISharedCounter {
 	}
 
 	public async initializingFirstTime(props?: any): Promise<void> {
-		const counter = new SharedCounter(
-			"counter",
-			this.runtime,
-			SharedCounter.getFactory().attributes,
-		);
-		this.runtime.addChannel(counter);
+		const counter = SharedCounter.create(this.runtime, "counter");
 		counter.bindToContext();
 	}
 

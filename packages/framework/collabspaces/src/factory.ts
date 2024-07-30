@@ -4,13 +4,6 @@
  */
 
 import {
-	IFluidDataStoreChannel,
-	IFluidDataStoreFactory,
-	NamedFluidDataStoreRegistryEntries,
-	IFluidDataStoreContext,
-	NamedFluidDataStoreRegistryEntry,
-} from "@fluidframework/runtime-definitions/internal";
-import {
 	ChannelCollectionFactory,
 	ChannelCollection,
 } from "@fluidframework/container-runtime/internal";
@@ -19,13 +12,20 @@ import {
 	IChannelFactory,
 	IFluidDataStoreRuntime,
 } from "@fluidframework/datastore-definitions/internal";
-import { SharedMatrixFactory, SharedMatrix } from "@fluidframework/matrix/internal";
-import { DeferredChannelFactory } from "./deferreChannel.js";
+import { SharedMatrix } from "@fluidframework/matrix/internal";
+import {
+	IFluidDataStoreChannel,
+	IFluidDataStoreFactory,
+	NamedFluidDataStoreRegistryEntries,
+	IFluidDataStoreContext,
+	NamedFluidDataStoreRegistryEntry,
+} from "@fluidframework/runtime-definitions/internal";
 
 // import { DeferredChannel, DeferredChannelFactory } from "./deferreChannel";
 
 import { CollabSpacesRuntime } from "./collabSpaces.js";
 import { IEfficientMatrix, IEfficientMatrixTest } from "./contracts.js";
+import { DeferredChannelFactory } from "./deferreChannel.js";
 
 export class MatrixDataStoreFactory implements IFluidDataStoreFactory {
 	public static readonly type = "__matrixType";
@@ -43,7 +43,7 @@ export class MatrixDataStoreFactory implements IFluidDataStoreFactory {
 		context: IFluidDataStoreContext,
 		existing: boolean,
 	): Promise<FluidDataStoreRuntime> {
-		const matrixF = new SharedMatrixFactory();
+		const matrixF = SharedMatrix.getFactory();
 		const dataTypes = new Map<string, IChannelFactory>();
 		dataTypes.set(matrixF.type, matrixF);
 
@@ -59,10 +59,7 @@ export class MatrixDataStoreFactory implements IFluidDataStoreFactory {
 		);
 
 		if (!existing) {
-			const matrix = runtime.createChannel(
-				matrixDdsId,
-				SharedMatrixFactory.Type,
-			) as SharedMatrix;
+			const matrix = runtime.createChannel(matrixDdsId, matrixF.type) as SharedMatrix;
 
 			// Insert row/col for tracking row/col internal IDs
 			matrix.insertCols(0, 1);

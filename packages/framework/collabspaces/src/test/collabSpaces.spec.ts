@@ -3,8 +3,26 @@
  * Licensed under the MIT License.
  */
 
-import { assert, delay } from "@fluidframework/core-utils/internal";
+import { LocalServerTestDriver } from "@fluid-private/test-drivers";
+import { BaseContainerRuntimeFactory } from "@fluidframework/aqueduct/internal";
+import {
+	AttachState,
+	IContainer,
+	IHostLoader,
+} from "@fluidframework/container-definitions/internal";
+import { Loader } from "@fluidframework/container-loader/internal";
+import {
+	IContainerRuntimeOptions,
+	ISummarizer,
+	ISummaryRuntimeOptions,
+	SummaryCollection,
+} from "@fluidframework/container-runtime/internal";
+import { type IContainerRuntime } from "@fluidframework/container-runtime-definitions/internal";
 import { type FluidObject } from "@fluidframework/core-interfaces";
+import { assert, delay } from "@fluidframework/core-utils/internal";
+import { IRevertible } from "@fluidframework/matrix/internal";
+import { type IFluidDataStoreFactory } from "@fluidframework/runtime-definitions/internal";
+import { createChildLogger } from "@fluidframework/telemetry-utils/internal";
 import {
 	ITestObjectProvider,
 	TestContainerRuntimeFactory,
@@ -13,24 +31,6 @@ import {
 	summarizeNow,
 	createSummarizerCore,
 } from "@fluidframework/test-utils/internal";
-import { BaseContainerRuntimeFactory } from "@fluidframework/aqueduct/internal";
-import {
-	AttachState,
-	IContainer,
-	IHostLoader,
-} from "@fluidframework/container-definitions/internal";
-import {
-	IContainerRuntimeOptions,
-	ISummarizer,
-	ISummaryRuntimeOptions,
-	SummaryCollection,
-} from "@fluidframework/container-runtime/internal";
-import { type IFluidDataStoreFactory } from "@fluidframework/runtime-definitions/internal";
-import { LocalServerTestDriver } from "@fluid-private/test-drivers";
-import { Loader } from "@fluidframework/container-loader/internal";
-import { createChildLogger } from "@fluidframework/telemetry-utils/internal";
-import { IRevertible } from "@fluidframework/matrix/internal";
-import { type IContainerRuntime } from "@fluidframework/container-runtime-definitions/internal";
 
 import {
 	CollabSpaceCellType,

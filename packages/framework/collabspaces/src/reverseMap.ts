@@ -4,6 +4,7 @@
  */
 
 import { assert } from "@fluidframework/core-utils/internal";
+
 import { uuidType } from "./collabSpaces.js";
 
 export type ReverseMapType = "row" | "col";
@@ -51,8 +52,8 @@ export class ReverseMap implements IReverseMap {
 		assert(map !== undefined, "map should not be undefined");
 		const newEntry = new Entry(uniqueIdentifier, index);
 		map.splice(index, 0, newEntry);
-		for (let i = map[index]!.index; i < map.length; i++) {
-			map[i]!.index = i + 1;
+		for (let i = map[index].index; i < map.length; i++) {
+			map[i].index = i + 1;
 		}
 	}
 
@@ -67,7 +68,7 @@ export class ReverseMap implements IReverseMap {
 		if (index !== -1) {
 			map.splice(index, count);
 			for (let i = index; i < map.length; i++) {
-				map[i]!.index = i + 1;
+				map[i].index = i + 1;
 			}
 		}
 	}

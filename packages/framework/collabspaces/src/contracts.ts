@@ -3,13 +3,12 @@
  * Licensed under the MIT License.
  */
 import { Serializable } from "@fluidframework/datastore-definitions/internal";
+import { ISharedMatrixCore, MatrixItem } from "@fluidframework/matrix/internal";
 import {
 	IFluidDataStoreChannel,
 	IFluidDataStoreFactory,
 	IFluidDataStoreContext,
 } from "@fluidframework/runtime-definitions/internal";
-
-import { ISharedMatrixCore, MatrixItem } from "@fluidframework/matrix/internal";
 
 /**
  * Interface for internal communication

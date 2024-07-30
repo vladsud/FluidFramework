@@ -3,7 +3,17 @@
  * Licensed under the MIT License.
  */
 
+import { AttachState } from "@fluidframework/container-definitions";
+import {
+	FluidObject,
+	IFluidHandleInternal,
+	IRequest,
+	IResponse,
+} from "@fluidframework/core-interfaces/internal";
 import { assert } from "@fluidframework/core-utils/internal";
+import { FluidObjectHandle } from "@fluidframework/datastore/internal";
+import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
+import { readAndParse } from "@fluidframework/driver-utils/internal";
 import {
 	IFluidDataStoreContext,
 	ITelemetryContext,
@@ -13,16 +23,6 @@ import {
 	ISummaryTreeWithStats,
 } from "@fluidframework/runtime-definitions/internal";
 import { createSingleBlobSummary } from "@fluidframework/shared-object-base/internal";
-import { readAndParse } from "@fluidframework/driver-utils/internal";
-import {
-	FluidObject,
-	IFluidHandleInternal,
-	IRequest,
-	IResponse,
-} from "@fluidframework/core-interfaces/internal";
-import { type ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
-import { FluidObjectHandle } from "@fluidframework/datastore/internal";
-import { AttachState } from "@fluidframework/container-definitions";
 
 import { ICollabChannelFactory } from "./contracts.js";
 
