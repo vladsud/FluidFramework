@@ -209,7 +209,7 @@ export async function getInternalChannel(
 class SpecialLocalContext extends LocalFluidDataStoreContext {
 	constructor(props) {
 		super(props);
-		assert(this.pkg !== undefined, 0x14a /* "Undefined package path" */);
+		assert(this.pkg !== undefined, "Undefined package path");
 	}
 
 	public delete() {
@@ -217,7 +217,7 @@ class SpecialLocalContext extends LocalFluidDataStoreContext {
 	}
 
 	public attachRuntime(dataStoreChannel: Promise<IFluidDataStoreChannel>) {
-		assert(this.channelP === undefined, 0x155 /* "channel deferral is already set" */);
+		assert(this.channelP === undefined, "channel deferral is already set");
 
 		this.channelP = Promise.resolve()
 			.then(async () => {
@@ -506,8 +506,8 @@ export class CollabSpacesRuntime
 			)) as Record<string, IChannelTrackingInfo>;
 		}
 
-		const channel = await this.contexts.get(matrixId)?.realize();
-		this.matrixInternal = (await channel?.entryPoint.get()) as SharedMatrix;
+		const matrix = await this.contexts.get(matrixId)?.realize();
+		this.matrixInternal = (await matrix?.entryPoint.get()) as SharedMatrix;
 
 		// Rebuild deferred channels
 		this.deferredChannels = new Map();

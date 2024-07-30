@@ -11601,6 +11601,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: ^0.15.2
         version: 0.15.2
+      '@biomejs/biome':
+        specifier: ~1.8.3
+        version: 1.8.3
       '@fluid-internal/mocha-test-setup':
         specifier: workspace:~
         version: link:../../test/mocha-test-setup
@@ -11646,6 +11649,9 @@ importers:
       c8:
         specifier: ^8.0.1
         version: 8.0.1
+      concurrently:
+        specifier: ^8.2.1
+        version: 8.2.2
       copyfiles:
         specifier: ^2.4.1
         version: 2.4.1
@@ -11665,7 +11671,7 @@ importers:
         specifier: ^1.5.1
         version: 1.5.1(mocha@10.2.0)
       moment:
-        specifier: ^2.29.4
+        specifier: ^2.21.0
         version: 2.29.4
       prettier:
         specifier: ~3.0.3
