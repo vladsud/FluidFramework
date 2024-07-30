@@ -13,19 +13,19 @@ export interface IRevertible {
 }
 
 // @alpha (undocumented)
-export interface ISharedMatrix<T = any> extends IEventProvider<ISharedMatrixEvents<T>>, ISharedMatrixCore, IChannel {
+export interface ISharedMatrix<T = any> extends ISharedObject<ISharedMatrixEvents<T> & ISharedObjectEvents>, ISharedMatrixCore<T>, IChannel {
+    isSetCellConflictResolutionPolicyFWW(): boolean;
+    switchSetCellPolicy(): void;
 }
 
 // @alpha (undocumented)
 export interface ISharedMatrixCore<T = any> extends IMatrixProducer<MatrixItem<T>>, IMatrixReader<MatrixItem<T>>, IMatrixWriter<MatrixItem<T>> {
     insertCols(colStart: number, count: number): void;
     insertRows(rowStart: number, count: number): void;
-    isSetCellConflictResolutionPolicyFWW(): boolean;
     openUndo(consumer: IUndoConsumer): void;
     removeCols(colStart: number, count: number): void;
     removeRows(rowStart: number, count: number): void;
     setCells(rowStart: number, colStart: number, colCount: number, values: readonly MatrixItem<T>[]): void;
-    switchSetCellPolicy(): void;
 }
 
 // @alpha

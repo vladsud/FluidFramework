@@ -40,6 +40,7 @@ declare type current_as_old_for_Interface_IRevertible = requireAssignableTo<Type
  * typeValidation.broken:
  * "Interface_ISharedMatrix": {"forwardCompat": false}
  */
+// @ts-expect-error compatibility expected to be broken
 declare type old_as_current_for_Interface_ISharedMatrix = requireAssignableTo<TypeOnly<old.ISharedMatrix>, TypeOnly<current.ISharedMatrix>>
 
 /*
@@ -121,6 +122,7 @@ declare type current_as_old_for_Variable_SharedMatrix = requireAssignableTo<Type
  * typeValidation.broken:
  * "TypeAlias_SharedMatrix": {"forwardCompat": false}
  */
+// @ts-expect-error compatibility expected to be broken
 declare type old_as_current_for_TypeAlias_SharedMatrix = requireAssignableTo<TypeOnly<old.SharedMatrix>, TypeOnly<current.SharedMatrix>>
 
 /*
