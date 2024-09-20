@@ -288,13 +288,9 @@ export class ParallelRequests<T> {
 						!partial,
 						0x10f /* "empty/partial chunks should not be returned by caching" */,
 					);
-					assert(
-						!this.knewTo,
-						0x110 /* "callback should retry until valid fetch before it learns new boundary" */,
-					);
 				}
 
-				if (!partial && !fullChunk) {
+				if (!partial) {
 					if (!this.knewTo) {
 						if (this.to === undefined || this.to > from) {
 							// The END
@@ -308,12 +304,14 @@ export class ParallelRequests<T> {
 					// We will come back to request more, and if we can't get any more ops soon, it's
 					// catastrophic failure (see comment above on responsibility of callback to return something)
 					// This layer will just keep trying until it gets full set.
-					this.logger.sendPerformanceEvent({
-						eventName: "ParallelRequests_Partial",
-						from: fromOrig,
-						to,
-						length,
-					});
+					if (!fullChunk) {
+						this.logger.sendPerformanceEvent({
+							eventName: "ParallelRequests_Partial",
+							from: fromOrig,
+							to,
+							length,
+						});
+					}
 				}
 
 				if (to === this.latestRequested) {

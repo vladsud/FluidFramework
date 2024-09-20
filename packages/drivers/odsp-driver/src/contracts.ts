@@ -46,11 +46,19 @@ export interface IOdspSocketError {
  * Contains either SequencedDocumentMessages or SequencedDeltaOpMessage.
  */
 export interface IDeltaStorageGetResponse {
-	value: ISequencedDocumentMessage[] | ISequencedDeltaOpMessage[];
+	"@odata.context": string;
+	// the last message could be null, only conveying the last sequence number
+	value: ISequencedDocumentMessage[] | ISequencedDeltaOpMessageOrNull[];
 }
 
 export interface ISequencedDeltaOpMessage {
 	op: ISequencedDocumentMessage;
+	sequenceNumber: number;
+}
+
+export interface ISequencedDeltaOpMessageOrNull {
+	// eslint-disable-next-line @rushstack/no-new-null
+	op: ISequencedDocumentMessage | null;
 	sequenceNumber: number;
 }
 
@@ -202,6 +210,7 @@ export interface IVersionedValueWithEpoch {
 
 export const persistedCacheValueVersion = 3;
 
+// PUSH "get_ops" response. IDeltaStorageGetResponse is for storage requests / payloads.
 export interface IGetOpsResponse {
 	nonce: string;
 	code: number;

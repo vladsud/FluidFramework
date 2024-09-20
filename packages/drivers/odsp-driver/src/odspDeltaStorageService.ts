@@ -45,11 +45,13 @@ export class OdspDeltaStorageService {
 	 * @returns ops retrieved & info if result was partial (i.e. more is available)
 	 */
 	public async get(
-		from: number,
-		to: number,
+		from: number, // inclusive
+		to: number, // exclusive
 		telemetryProps: ITelemetryBaseProperties,
 		scenarioName?: string,
 	): Promise<IDeltasFetchResult> {
+		assert(from < to, "bounds check");
+
 		return getWithRetryForTokenRefresh(async (options) => {
 			// Note - this call ends up in getSocketStorageDiscovery() and can refresh token
 			// Thus it needs to be done before we call getAuthHeader() to reduce extra calls
@@ -75,8 +77,9 @@ export class OdspDeltaStorageService {
 					let postBody = `--${formBoundary}\r\n`;
 					postBody += `Authorization: ${authHeader}\r\n`;
 					postBody += `X-HTTP-Method-Override: GET\r\n`;
-
 					postBody += `_post: 1\r\n`;
+					// A hint to service that client can accept a "null" op as an indication of how many ops there are.
+					postBody += `X-FluidNullOp: true\r\n`;
 					postBody += `\r\n--${formBoundary}--`;
 					const headers: { [index: string]: string } = {
 						"Content-Type": `multipart/form-data;boundary=${formBoundary}`,
@@ -105,21 +108,70 @@ export class OdspDeltaStorageService {
 						);
 					clearTimeout(timer);
 					const deltaStorageResponse = response.content;
+
+					let lastSequenceNumber: number | undefined;
+
+					// This accounts for possible null ops
+					const responseLength = deltaStorageResponse.value.length;
+					// could be undefined if responseLength === undefined!
+					const possiblyNullOp = deltaStorageResponse.value[responseLength - 1];
+					if (
+						possiblyNullOp !== undefined &&
+						"op" in possiblyNullOp &&
+						possiblyNullOp.op === null
+					) {
+						// it's 1 over last known sequence number to storage
+						lastSequenceNumber = possiblyNullOp.sequenceNumber - 1;
+						// remove the last item
+						deltaStorageResponse.value.pop();
+					}
+
+					// Actual number of ops with content
+					const length = deltaStorageResponse.value.length;
+
 					const messages =
-						deltaStorageResponse.value.length > 0 && "op" in deltaStorageResponse.value[0]
-							? (deltaStorageResponse.value as ISequencedDeltaOpMessage[]).map(
-									(operation) => operation.op,
-								)
+						length > 0 && "op" in deltaStorageResponse.value[0]
+							? (deltaStorageResponse.value as ISequencedDeltaOpMessage[]).map((operation) => {
+									assert(operation.op !== null, "null can be only last entry");
+									return operation.op;
+								})
 							: (deltaStorageResponse.value as ISequencedDocumentMessage[]);
 
+					// validate integrity of the response
+					let seq = from;
+					for (const op of messages) {
+						assert(seq === op.sequenceNumber, "seq#");
+						seq++;
+					}
+
 					event.end({
-						length: messages.length,
+						length,
 						...response.propsToLog,
 					});
 
+					// The protocol was - if the service returns less ops than what client asked, then that's all service has.
+					// However due to some incidents, service made a recent change to return less content to the client if payload is too large.
+					// Once we have lastSequenceNumber, we will know for sure if fewer ops returned means - EOF or throttling.
+					// If client tries to fill in ops gap, then it knows how many ops it needs and it  does not matter what the value of
+					// `partialResult` - if there are not enough ops, client will ask for more (in a loop), even if service has no more ops.
+					// It matters only when client does not know much about how long the tail is.
+					// While it's not correct in presence of service throttling, we will continue to assume (no change in behavior from the past) that
+					// - if fewer ops are returned, that's all service has
+					// - if request is fully satisfied, there are probably more ops out there.
+					let partialResult = seq === to;
+
+					if (lastSequenceNumber !== undefined) {
+						if (length === 0) {
+							assert(lastSequenceNumber < from, "empty partial results are not allowed");
+							assert(!partialResult, "not allowed");
+						} else {
+							partialResult = lastSequenceNumber > messages[length - 1].sequenceNumber;
+						}
+					}
+
 					// It is assumed that server always returns all the ops that it has in the range that was requested.
 					// This may change in the future, if so, we need to adjust and receive "end" value from server in such case.
-					return { messages, partialResult: false };
+					return { messages, partialResult };
 				},
 			);
 		});

@@ -172,8 +172,16 @@ export class DeltaStorageService implements IDeltaStorageService {
 			},
 		);
 
-		// It is assumed that server always returns all the ops that it has in the range that was requested.
-		// This may change in the future, if so, we need to adjust and receive "end" value from server in such case.
-		return { messages: ops, partialResult: false };
+		// 1. If no ops returned, then it's always full result - service has to return at least one op (within the range), so empty response means EOF
+		//    partialResult = false
+		// 2. If only some ops returned, it's not partial result. It's assumed server always rerurns all the ops that it has in the range that was requested.
+		//    partialResult = false
+		// 3. If all requested ops returned, then
+		//    a. Client was trying to fill in the gap - the value of `partialResult` does not matter in such case.
+		//    b. Client was trying to fetch tail and does not know how many ops there are. It need to come back and ask for more.
+		//      partialResult = true.
+		const partialResult = ops.length > 0 && ops[ops.length - 1].sequenceNumber === to;
+
+		return { messages: ops, partialResult };
 	}
 }

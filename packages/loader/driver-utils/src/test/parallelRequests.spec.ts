@@ -17,18 +17,23 @@ enum HowMany {
 }
 
 describe("Parallel Requests", () => {
-	async function test(
+	async function testCore(
 		concurrency: number,
 		payloadSize: number,
 		from: number,
 		to: number,
-		expectedRequests: number,
 		knownTo: boolean,
-		howMany: HowMany = HowMany.Exact,
+		responses: ((
+			request: number,
+			_from: number,
+			_to: number,
+		) => { partial: boolean; cancel: boolean; payload: number[] })[],
+		dispatchesTotal?: number,
 	) {
 		let nextElement = from;
 		let requests = 0;
 		let dispatches = 0;
+		let lastSeq: number | undefined;
 
 		const logger = new MockLogger();
 
@@ -38,44 +43,19 @@ describe("Parallel Requests", () => {
 			payloadSize,
 			logger.toTelemetryLogger(),
 			async (request: number, _from: number, _to: number) => {
-				let length = _to - _from;
+				const response = responses.shift();
+				assert(response !== undefined, "too many requests");
 				requests++;
-
-				assert(_from >= from);
-				assert(length <= payloadSize);
-				assert(requests <= request);
-				assert(!knownTo || _to <= to);
-
-				switch (howMany) {
-					case HowMany.Partial:
-						length = Math.min(length, payloadSize / 2 + 1);
-						break;
-					case HowMany.TooMany:
-						length = 2 * length + 2;
-						break;
-					case HowMany.Exact:
-						break;
-					default:
-						unreachableCase(howMany);
+				const resp = response(request, _from, _to);
+				const len = resp.payload.length;
+				if (len > 0) {
+					lastSeq = resp.payload[len - 1];
+					assert(resp.payload[0] === _from);
 				}
-				// covering knownTo === false case
-				const actualTo = Math.min(_from + length, to);
-
-				const payload: number[] = [];
-				for (let i = _from; i < actualTo; i++) {
-					payload.push(i);
-				}
-
-				return {
-					partial: _from !== to && howMany === HowMany.Partial,
-					cancel: false,
-					payload,
-				};
+				return resp;
 			},
 			(deltas: number[]) => {
 				dispatches++;
-				// Big chunks are broken into smaller ones
-				assert(dispatches <= requests || howMany === HowMany.TooMany);
 				for (const el of deltas) {
 					assert(el === nextElement);
 					nextElement++;
@@ -84,11 +64,70 @@ describe("Parallel Requests", () => {
 		);
 
 		await manager.run(concurrency);
-
-		assert(nextElement === to);
-		assert(!knownTo || dispatches === requests);
-		assert.equal(requests, expectedRequests, "expected requests");
+		assert(nextElement <= to);
+		assert(!knownTo || nextElement === to);
+		assert(!knownTo || dispatches === (dispatchesTotal ?? requests));
+		if (lastSeq !== undefined && concurrency === 1) {
+			assert(lastSeq === nextElement - 1);
+		}
+		assert.equal(responses.length, 0, "expected requests");
 		logger.assertMatchNone([{ category: "error" }]);
+	}
+
+	function genPayload(from: number, to: number) {
+		const payload: number[] = [];
+		for (let i = from; i < to; i++) {
+			payload.push(i);
+		}
+		return payload;
+	}
+
+	async function test(
+		concurrency: number,
+		payloadSize: number,
+		from: number,
+		to: number,
+		expectedRequests: number,
+		knownTo: boolean,
+		howMany: HowMany = HowMany.Exact,
+	) {
+		const response = (request: number, _from: number, _to: number) => {
+			let length = _to - _from;
+
+			assert(_from >= from);
+			assert(length <= payloadSize);
+			assert(!knownTo || _to <= to);
+
+			switch (howMany) {
+				case HowMany.Partial:
+					length = Math.min(length, payloadSize / 2 + 1);
+					break;
+				case HowMany.TooMany:
+					length = 2 * length + 2;
+					break;
+				case HowMany.Exact:
+					break;
+				default:
+					unreachableCase(howMany);
+			}
+			// covering knownTo === false case
+			const actualTo = Math.min(_from + length, to);
+
+			return {
+				partial: _from !== to || howMany === HowMany.Partial,
+				cancel: false,
+				payload: genPayload(_from, actualTo),
+			};
+		};
+
+		return testCore(
+			concurrency,
+			payloadSize,
+			from,
+			to,
+			knownTo,
+			Array(expectedRequests).fill(response),
+		);
 	}
 
 	async function testCancel(
@@ -255,5 +294,152 @@ describe("Parallel Requests", () => {
 		}
 		assert(!success);
 		logger.assertMatchNone([{ category: "error" }]);
+	});
+
+	it("test no more ops", async () => {
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			false, // knownTo
+			[() => ({ partial: false, cancel: false, payload: [] })],
+		);
+	});
+
+	it("test partial responses #1", async () => {
+		// returning partial empty repsonse is not allowed - see assert 0x10f.
+		await assert.rejects(async () =>
+			testCore(
+				1, // concurrency
+				5000, // payloadSize
+				100, // from
+				200, // to
+				true, // knownTo
+				[
+					() => ({ partial: true, cancel: false, payload: [] }),
+					() => ({ partial: false, cancel: false, payload: genPayload(100, 200) }),
+				],
+			),
+		);
+	});
+
+	it("test partial responses #2", async () => {
+		// knownTo === true means client knows there are ops, but service tells us there are none.
+		// it should result in client comming back and asking for more
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			200, // to
+			true, // knownTo
+			[
+				() => ({ partial: false, cancel: false, payload: [] }),
+				() => ({ partial: false, cancel: false, payload: genPayload(100, 200) }),
+			],
+			1, // dispatchesTotal
+		);
+	});
+
+	it("test partial responses #3", async () => {
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			200, // to
+			true, // knownTo
+			[
+				() => ({ partial: true, cancel: false, payload: genPayload(100, 150) }),
+				() => ({ partial: false, cancel: false, payload: genPayload(150, 200) }),
+			],
+		);
+	});
+
+	it("test partial but complete response", async () => {
+		// it should not matter if there are more - client got all it needed.
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			200, // to
+			true, // knownTo
+			[() => ({ partial: true, cancel: false, payload: genPayload(100, 200) })],
+		);
+	});
+
+	it("test tail #1", async () => {
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			false, // knownTo
+			[() => ({ partial: false, cancel: false, payload: genPayload(100, 200) })],
+		);
+	});
+
+	it("test tail #2", async () => {
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			false, // knownTo
+			[
+				() => ({ partial: true, cancel: false, payload: genPayload(100, 200) }),
+				() => ({ partial: false, cancel: false, payload: genPayload(200, 202) }),
+			],
+		);
+	});
+
+	it("test complete chunk #1", async () => {
+		// We hit the chunk size and client does not need more, so there should be only one request.
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			true, // knownTo
+			[() => ({ partial: false, cancel: false, payload: genPayload(100, 5100) })],
+		);
+	});
+
+	it("test complete chunk #2", async () => {
+		// We hit the chunk size and client does not need more, so there should be only one request.
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			true, // knownTo
+			[() => ({ partial: true, cancel: false, payload: genPayload(100, 5100) })],
+		);
+	});
+
+	it("test complete chunk #3", async () => {
+		// Here, because we do not know how long is the file, it will turn around and ask for more if we hit the chunk size.
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			false, // knownTo
+			[
+				() => ({ partial: true, cancel: false, payload: genPayload(100, 5100) }),
+				() => ({ partial: false, cancel: false, payload: [] }),
+			],
+		);
+	});
+
+	it("test complete chunk #4", async () => {
+		// The system should trust `partial` data, even if we hit the chunk size - if there are no more, then there are no more.
+		await testCore(
+			1, // concurrency
+			5000, // payloadSize
+			100, // from
+			5100, // to
+			false, // knownTo
+			[() => ({ partial: false, cancel: false, payload: genPayload(100, 5100) })],
+		);
 	});
 });
