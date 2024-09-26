@@ -17,7 +17,11 @@ import {
 } from "@fluidframework/odsp-driver-definitions/internal";
 import { ITelemetryLoggerExt, MockLogger } from "@fluidframework/telemetry-utils/internal";
 
-import { IDeltaStorageGetResponse, ISequencedDeltaOpMessageOrNull } from "../contracts.js";
+import {
+	ISequencedDeltaOpMessage,
+	IDeltaStorageGetResponse1,
+	IDeltaStorageGetResponse2,
+} from "../contracts.js";
 import { EpochTracker } from "../epochTracker.js";
 import { LocalPersistentCache } from "../odspCache.js";
 import {
@@ -69,7 +73,7 @@ describe("DeltaStorageService", () => {
 	});
 
 	describe("Get Returns Response With Op Envelope", () => {
-		const expectedDeltaFeedResponse: IDeltaStorageGetResponse = {
+		const expectedDeltaFeedResponse: IDeltaStorageGetResponse1 = {
 			"@odata.context": "some context",
 			value: [
 				{
@@ -146,12 +150,10 @@ describe("DeltaStorageService", () => {
 		});
 
 		it("Partial response", async () => {
-			const expectedDeltaFeedResponsePartial: IDeltaStorageGetResponse = {
-				...expectedDeltaFeedResponse,
-				value: [
-					...(expectedDeltaFeedResponse.value as ISequencedDeltaOpMessageOrNull[]),
-					{ sequenceNumber: 100, op: null },
-				],
+			const expectedDeltaFeedResponsePartial: IDeltaStorageGetResponse2 = {
+				ops: expectedDeltaFeedResponse.value.map((op) => op.op),
+				latestSequenceNumber: 100,
+				latestSnapshotSequenceNumber: 0,
 			};
 
 			const { messages, partialResult } = await mockFetchOk(
@@ -190,9 +192,10 @@ describe("DeltaStorageService", () => {
 		});
 
 		it("Empty partial response not allowed", async () => {
-			const expectedDeltaFeedResponseEmptyPartial: IDeltaStorageGetResponse = {
-				...expectedDeltaFeedResponse,
-				value: [{ sequenceNumber: 100, op: null }],
+			const expectedDeltaFeedResponseEmptyPartial: IDeltaStorageGetResponse2 = {
+				ops: [],
+				latestSequenceNumber: 100,
+				latestSnapshotSequenceNumber: 0,
 			};
 
 			await assert.rejects(
@@ -204,9 +207,10 @@ describe("DeltaStorageService", () => {
 		});
 
 		it("Empty response with null", async () => {
-			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse = {
-				...expectedDeltaFeedResponse,
-				value: [{ sequenceNumber: 1, op: null }],
+			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse2 = {
+				ops: [],
+				latestSequenceNumber: 1,
+				latestSnapshotSequenceNumber: 0,
 			};
 
 			const { messages, partialResult } = await mockFetchOk(
@@ -219,9 +223,10 @@ describe("DeltaStorageService", () => {
 		});
 
 		it("Empty response with null #2", async () => {
-			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse = {
-				...expectedDeltaFeedResponse,
-				value: [{ sequenceNumber: 2, op: null }],
+			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse2 = {
+				ops: [],
+				latestSequenceNumber: 2,
+				latestSnapshotSequenceNumber: 0,
 			};
 
 			// should fail because no ops are retured, even though storage tells us there are some ops (op#1)
@@ -335,8 +340,12 @@ describe("DeltaStorageService", () => {
 			logger.assertMatchNone([{ category: "error" }]);
 		}
 
-		function getOps(from: number, to: number, lastSeq?: number): IDeltaStorageGetResponse {
-			const ops: ISequencedDeltaOpMessageOrNull[] = [];
+		function getOps(
+			from: number,
+			to: number,
+			lastSeq?: number,
+		): IDeltaStorageGetResponse1 | IDeltaStorageGetResponse2 {
+			const ops: ISequencedDeltaOpMessage[] = [];
 
 			for (let seq = from; seq < to; seq++) {
 				ops.push({
@@ -355,7 +364,11 @@ describe("DeltaStorageService", () => {
 			}
 
 			if (lastSeq !== undefined) {
-				ops.push({ sequenceNumber: lastSeq, op: null });
+				return {
+					ops: ops.map((op) => op.op),
+					latestSequenceNumber: lastSeq,
+					latestSnapshotSequenceNumber: 0,
+				};
 			}
 			return {
 				"@odata.context": "some context",

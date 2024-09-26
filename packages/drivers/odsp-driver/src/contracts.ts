@@ -45,20 +45,50 @@ export interface IOdspSocketError {
  * Interface for delta storage response.
  * Contains either SequencedDocumentMessages or SequencedDeltaOpMessage.
  */
-export interface IDeltaStorageGetResponse {
+export interface IDeltaStorageGetResponse1 {
 	"@odata.context": string;
-	// the last message could be null, only conveying the last sequence number
-	value: ISequencedDocumentMessage[] | ISequencedDeltaOpMessageOrNull[];
+	value: ISequencedDeltaOpMessage[];
+
+	// This is not part of server response - it's here to make TSC compiler happier when
+	// using (IDeltaStorageGetResponse1 | IDeltaStorageGetResponse2).latestSequenceNumber.
+	latestSequenceNumber?: never;
+}
+
+/**
+ * The response format returned by the service if client specifies Prefer = newfluidopcollection header.
+ */
+export interface IDeltaStorageGetResponse2 {
+	/**
+	 * Ops returned by the service
+	 */
+	ops: ISequencedDocumentMessage[];
+
+	/**
+	 * Sequence number of the first op returned.
+	 * Undefined if no ops are returned.
+	 */
+	sequenceNumber?: number;
+
+	/**
+	 * Sequence number of the last deleted op. Storage periodically deletes old ops (older than 30 days).
+	 * (genesisSequenceNumber, latestSequenceNumber] is the range of ops available for fetching.
+	 * Could be undefined (this info could be missing from cache entries on SPO side)
+	 */
+	genesisSequenceNumber?: number;
+
+	/**
+	 * The last sequence number known to the service - client can ask for ops (and receive them) up to this number
+	 */
+	latestSequenceNumber: number;
+
+	/**
+	 * The reference sequence number of a last summary / snapshot posted for this file.
+	 */
+	latestSnapshotSequenceNumber: number;
 }
 
 export interface ISequencedDeltaOpMessage {
 	op: ISequencedDocumentMessage;
-	sequenceNumber: number;
-}
-
-export interface ISequencedDeltaOpMessageOrNull {
-	// eslint-disable-next-line @rushstack/no-new-null
-	op: ISequencedDocumentMessage | null;
 	sequenceNumber: number;
 }
 
@@ -210,7 +240,7 @@ export interface IVersionedValueWithEpoch {
 
 export const persistedCacheValueVersion = 3;
 
-// PUSH "get_ops" response. IDeltaStorageGetResponse is for storage requests / payloads.
+// PUSH "get_ops" response. IDeltaStorageGetResponse1 is for storage requests / payloads.
 export interface IGetOpsResponse {
 	nonce: string;
 	code: number;

@@ -290,7 +290,7 @@ export class ParallelRequests<T> {
 					);
 				}
 
-				if (!partial) {
+				if (!partial && !fullChunk) {
 					if (!this.knewTo) {
 						if (this.to === undefined || this.to > from) {
 							// The END

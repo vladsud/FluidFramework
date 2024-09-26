@@ -20,7 +20,7 @@ import {
 } from "@fluidframework/telemetry-utils/internal";
 import { v4 as uuid } from "uuid";
 
-import { IDeltaStorageGetResponse, ISequencedDeltaOpMessage } from "./contracts.js";
+import { IDeltaStorageGetResponse1, IDeltaStorageGetResponse2 } from "./contracts.js";
 import { EpochTracker } from "./epochTracker.js";
 import { OdspDocumentStorageService } from "./odspDocumentStorageManager.js";
 import { getWithRetryForTokenRefresh } from "./odspUtils.js";
@@ -79,7 +79,7 @@ export class OdspDeltaStorageService {
 					postBody += `X-HTTP-Method-Override: GET\r\n`;
 					postBody += `_post: 1\r\n`;
 					// A hint to service that client can accept a "null" op as an indication of how many ops there are.
-					postBody += `X-FluidNullOp: true\r\n`;
+					postBody += `Prefer: newfluidopcollection\r\n`;
 					postBody += `\r\n--${formBoundary}--`;
 					const headers: { [index: string]: string } = {
 						"Content-Type": `multipart/form-data;boundary=${formBoundary}`,
@@ -93,49 +93,32 @@ export class OdspDeltaStorageService {
 					const abort = new AbortController();
 					const timer = setTimeout(() => abort.abort(), 30000);
 
-					const response =
-						await this.epochTracker.fetchAndParseAsJSON<IDeltaStorageGetResponse>(
-							url,
-							{
-								headers,
-								body: postBody,
-								method,
-								signal: abort.signal,
-							},
-							"ops",
-							true,
-							scenarioName,
-						);
+					const response = await this.epochTracker.fetchAndParseAsJSON<
+						IDeltaStorageGetResponse1 | IDeltaStorageGetResponse2
+					>(
+						url,
+						{
+							headers,
+							body: postBody,
+							method,
+							signal: abort.signal,
+						},
+						"ops",
+						true,
+						scenarioName,
+					);
 					clearTimeout(timer);
 					const deltaStorageResponse = response.content;
 
-					let lastSequenceNumber: number | undefined;
-
-					// This accounts for possible null ops
-					const responseLength = deltaStorageResponse.value.length;
-					// could be undefined if responseLength === undefined!
-					const possiblyNullOp = deltaStorageResponse.value[responseLength - 1];
-					if (
-						possiblyNullOp !== undefined &&
-						"op" in possiblyNullOp &&
-						possiblyNullOp.op === null
-					) {
-						// it's 1 over last known sequence number to storage
-						lastSequenceNumber = possiblyNullOp.sequenceNumber - 1;
-						// remove the last item
-						deltaStorageResponse.value.pop();
-					}
+					const lastSequenceNumber: number | undefined =
+						deltaStorageResponse.latestSequenceNumber;
+					const messages: ISequencedDocumentMessage[] =
+						"value" in deltaStorageResponse
+							? deltaStorageResponse.value.map((operation) => operation.op)
+							: deltaStorageResponse.ops;
 
 					// Actual number of ops with content
-					const length = deltaStorageResponse.value.length;
-
-					const messages =
-						length > 0 && "op" in deltaStorageResponse.value[0]
-							? (deltaStorageResponse.value as ISequencedDeltaOpMessage[]).map((operation) => {
-									assert(operation.op !== null, "null can be only last entry");
-									return operation.op;
-								})
-							: (deltaStorageResponse.value as ISequencedDocumentMessage[]);
+					const length = messages.length;
 
 					// validate integrity of the response
 					let seq = from;
