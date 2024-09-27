@@ -149,7 +149,7 @@ describe("DeltaStorageService", () => {
 			);
 		});
 
-		it("Partial response", async () => {
+		it("Partial response new format", async () => {
 			const expectedDeltaFeedResponsePartial: IDeltaStorageGetResponse2 = {
 				ops: expectedDeltaFeedResponse.value.map((op) => op.op),
 				latestSequenceNumber: 100,
@@ -191,7 +191,7 @@ describe("DeltaStorageService", () => {
 			assert.equal(messages.length, 0, "Deserialized feed response is not of expected length");
 		});
 
-		it("Empty partial response not allowed", async () => {
+		it("Empty partial response not allowed (new format)", async () => {
 			const expectedDeltaFeedResponseEmptyPartial: IDeltaStorageGetResponse2 = {
 				ops: [],
 				latestSequenceNumber: 100,
@@ -206,7 +206,7 @@ describe("DeltaStorageService", () => {
 			);
 		});
 
-		it("Empty response with null", async () => {
+		it("Empty response with new format", async () => {
 			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse2 = {
 				ops: [],
 				latestSequenceNumber: 1,
@@ -214,7 +214,7 @@ describe("DeltaStorageService", () => {
 			};
 
 			const { messages, partialResult } = await mockFetchOk(
-				async () => deltaStorageService.get(1, 8, {}),
+				async () => deltaStorageService.get(2, 8, {}),
 				expectedDeltaFeedResponseEmpty,
 			);
 
@@ -222,7 +222,7 @@ describe("DeltaStorageService", () => {
 			assert.equal(messages.length, 0, "Deserialized feed response is not of expected length");
 		});
 
-		it("Empty response with null #2", async () => {
+		it("Empty response with new format #2", async () => {
 			const expectedDeltaFeedResponseEmpty: IDeltaStorageGetResponse2 = {
 				ops: [],
 				latestSequenceNumber: 2,
@@ -394,7 +394,7 @@ describe("DeltaStorageService", () => {
 			logger.assertMatchNone([{ category: "error" }]);
 		});
 
-		it("Filling gaps: 2 requests", async () => {
+		it("Filling gaps with: 2 requests", async () => {
 			await mockFetchMultiple(
 				async () => testCore(5000, 1, 8, true),
 				[getResponse(1, 2), getResponse(2, 8)],
@@ -432,7 +432,7 @@ describe("DeltaStorageService", () => {
 		it("Fetching tail new format", async () => {
 			await mockFetchMultiple(
 				async () => testCore(5000, 1, 5001, false),
-				[getResponse(1, 100, 500), getResponse(100, 500, 500)],
+				[getResponse(1, 100, 500), getResponse(100, 501, 500)],
 			);
 		});
 
@@ -440,7 +440,7 @@ describe("DeltaStorageService", () => {
 		it("Fetching tail at the boundary new format", async () => {
 			await mockFetchMultiple(
 				async () => testCore(5000, 1, 5001, false),
-				[getResponse(1, 5001, 5001)],
+				[getResponse(1, 5001, 5000)],
 			);
 		});
 
@@ -453,8 +453,8 @@ describe("DeltaStorageService", () => {
 
 		it("Fetching long tail new format", async () => {
 			await mockFetchMultiple(
-				async () => testCore(5000, 1, 8000, false),
-				[getResponse(1, 5001, 7000), getResponse(5001, 8000, 8000)],
+				async () => testCore(5000, 1, 8001, false),
+				[getResponse(1, 5001, 7000), getResponse(5001, 8001, 8000)],
 			);
 		});
 	});
