@@ -21,41 +21,33 @@ const client = createOdspClient(clientProps);
  *
  * @returns The loaded container and container services.
  */
-export const loadFluidData = async (
+export async function loadFluidData<T extends ContainerSchema>(
 	itemId: string,
-	schema: ContainerSchema,
+	schema: T,
 ): Promise<{
 	services: OdspContainerServices;
 	container: IOdspFluidContainer;
-}> => {
-	const {
-		container,
-		services,
-	}: { container: IOdspFluidContainer; services: OdspContainerServices } =
-		await client.getContainer(itemId, schema);
+}> {
+	const { container, services } = await client.getContainer(itemId, schema);
 
 	return { services, container };
-};
+}
 
-export const createFluidData = async (
-	schema: ContainerSchema,
+export async function createFluidData<T extends ContainerSchema>(
+	schema: T,
 ): Promise<{
 	services: OdspContainerServices;
 	container: IOdspFluidContainer;
-}> => {
+}> {
 	// The client will create a new detached container using the schema
 	// A detached container will enable the app to modify the container before attaching it to the client
-	const {
-		container,
-		services,
-	}: { container: IOdspFluidContainer; services: OdspContainerServices } =
-		await client.createContainer(schema);
+	const { container, services } = await client.createContainer(schema);
 
 	return { services, container };
-};
+}
 
-export const containerSchema: ContainerSchema = {
+export const containerSchema = {
 	initialObjects: {
 		appData: SharedTree,
 	},
-};
+} satisfies ContainerSchema;

@@ -5,7 +5,6 @@
 
 // eslint-disable-next-line import/no-internal-modules
 import { IOdspFluidContainer } from "@fluidframework/odsp-client/internal";
-import { ITree } from "fluid-framework";
 import React from "react";
 import ReactDOM from "react-dom";
 
@@ -25,7 +24,7 @@ async function start(): Promise<void> {
 	// a new container.
 	let itemId: string = location.hash.slice(1);
 	const createNew = itemId.length === 0;
-	let container: IOdspFluidContainer;
+	let container: IOdspFluidContainer<typeof containerSchema>;
 
 	if (createNew) {
 		({ container } = await createFluidData(containerSchema));
@@ -33,7 +32,7 @@ async function start(): Promise<void> {
 		({ container } = await loadFluidData(itemId, containerSchema));
 	}
 
-	const tree = container.initialObjects.appData as ITree;
+	const tree = container.initialObjects.appData;
 	const appData = tree.viewWith(treeConfiguration);
 	if (createNew) {
 		appData.initialize({
@@ -49,12 +48,7 @@ async function start(): Promise<void> {
 	// the app renders instantly on create new flow. The app will be
 	// interactive immediately.
 	ReactDOM.render(
-		<ReactApp
-			data={appData}
-			container={container}
-			canvasSize={canvasSize}
-			cellSize={cellSize}
-		/>,
+		<ReactApp data={appData} canvasSize={canvasSize} cellSize={cellSize} />,
 		app,
 	);
 
@@ -86,12 +80,7 @@ async function start(): Promise<void> {
 
 		// Update the application state or components without forcing a full page reload
 		ReactDOM.render(
-			<ReactApp
-				data={appData}
-				container={container}
-				canvasSize={canvasSize}
-				cellSize={cellSize}
-			/>,
+			<ReactApp data={appData} canvasSize={canvasSize} cellSize={cellSize} />,
 			app,
 		);
 

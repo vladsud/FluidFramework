@@ -204,11 +204,13 @@ export function rebaseBranch<TChange>(
 	if (targetCommitIndex === -1) {
 		// If the targetCommit is not in the target path, then it is either disjoint from `target` or it is behind/at
 		// the commit where source and target diverge (ancestor), in which case there is nothing more to rebase
-		// TODO: Ideally, this would be an "assertExpensive"
-		assert(
-			findCommonAncestor(targetCommit, targetHead) !== undefined,
-			0x676 /* target commit is not in target branch */,
-		);
+		// TODO: Ideally, this would be an "assertExpensive". It is commented out because it causes O(N²) behavior when
+		// processing N inbound commits from the same client whose ref seq# is not advancing (which is a common case).
+		// N can be large when the client is sending a burst of changes (potentially on reconnection).
+		// assert(
+		// 	findCommonAncestor(targetCommit, targetHead) !== undefined,
+		// 	0x676 /* target commit is not in target branch */,
+		// );
 		return {
 			newSourceHead: sourceHead,
 			sourceChange: undefined,
@@ -372,7 +374,6 @@ export function rebaseChange<TChange>(
 }
 
 /**
- * @internal
  */
 export function revisionMetadataSourceFromInfo(
 	revInfos: readonly RevisionInfo[],
@@ -440,16 +441,17 @@ function rollbackFromCommit<TChange>(
 	mintRevisionTag: () => RevisionTag,
 	cache?: boolean,
 ): TaggedChange<TChange, RevisionTag> {
-	if (commit.rollback !== undefined) {
-		return commit.rollback;
+	const rollback = Rollback.get(commit);
+	if (rollback !== undefined) {
+		return rollback;
 	}
-	const untagged = changeRebaser.invert(commit, true);
 	const tag = mintRevisionTag();
+	const untagged = changeRebaser.invert(commit, true, tag);
 	const deeplyTaggedRollback = changeRebaser.changeRevision(untagged, tag, commit.revision);
 	const fullyTaggedRollback = tagRollbackInverse(deeplyTaggedRollback, tag, commit.revision);
 
 	if (cache === true) {
-		commit.rollback = fullyTaggedRollback;
+		Rollback.set(commit, fullyTaggedRollback);
 	}
 	return fullyTaggedRollback;
 }
@@ -618,4 +620,35 @@ export function findCommonAncestor<T extends { parent?: T }>(
 		pathB.length = 0;
 	}
 	return undefined;
+}
+
+export function replaceChange<TChange>(
+	commit: GraphCommit<TChange>,
+	change: TChange,
+): GraphCommit<TChange> {
+	const output = { ...commit, change };
+	Rollback.set(output, undefined);
+	return output;
+}
+
+/** Associates rollback data with commits */
+namespace Rollback {
+	const map = new WeakMap<GraphCommit<unknown>, TaggedChange<unknown, RevisionTag>>();
+
+	export function get<TChange>(
+		commit: GraphCommit<TChange>,
+	): TaggedChange<TChange, RevisionTag> | undefined {
+		return map.get(commit) as TaggedChange<TChange, RevisionTag> | undefined;
+	}
+
+	export function set<TChange>(
+		commit: GraphCommit<TChange>,
+		rollback: TaggedChange<TChange, RevisionTag> | undefined,
+	): void {
+		if (rollback === undefined) {
+			map.delete(commit);
+		} else {
+			map.set(commit, rollback);
+		}
+	}
 }

@@ -79,7 +79,9 @@ export class ContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents 
     ensureNoDataModelChanges<T>(callback: () => T): T;
     // (undocumented)
     get flushMode(): FlushMode;
+    // @deprecated
     get gcThrowOnTombstoneUsage(): boolean;
+    // @deprecated
     get gcTombstoneEnforcementAllowed(): boolean;
     generateDocumentUniqueId(): string | (number & {
         readonly SessionUnique: "cea55054-6b82-4cbf-ad19-1fa645ea3b3e";
@@ -192,12 +194,14 @@ export const disabledCompressionConfig: ICompressionRuntimeOptions;
 // @alpha
 export type DocumentSchemaValueType = string | string[] | true | number | undefined;
 
-// @alpha
+// @alpha @sealed
 export class DocumentsSchemaController {
     constructor(existing: boolean, snapshotSequenceNumber: number, documentMetadataSchema: IDocumentSchema | undefined, features: IDocumentSchemaFeatures, onSchemaChange: (schema: IDocumentSchemaCurrent) => void);
     maybeSendSchemaMessage(): IDocumentSchemaChangeMessage | undefined;
     // (undocumented)
     onDisconnect(): void;
+    processDocumentSchemaMessages(contents: IDocumentSchemaChangeMessage[], local: boolean, sequenceNumber: number): boolean;
+    // @deprecated
     processDocumentSchemaOp(content: IDocumentSchemaChangeMessage, local: boolean, sequenceNumber: number): boolean;
     // (undocumented)
     sessionSchema: IDocumentSchemaCurrent;
@@ -488,7 +492,7 @@ export interface INackSummaryResult {
     readonly summaryNackOp: ISummaryNackMessage;
 }
 
-// @alpha
+// @alpha @deprecated
 export const InactiveResponseHeaderKey = "isInactive";
 
 // @alpha (undocumented)
@@ -707,6 +711,21 @@ export interface IUploadSummaryResult extends Omit<IGenerateSummaryTreeResult, "
     // (undocumented)
     readonly stage: "upload";
     readonly uploadDuration: number;
+}
+
+// @alpha
+export function loadContainerRuntime(params: LoadContainerRuntimeParams): Promise<IContainerRuntime & IRuntime>;
+
+// @alpha
+export interface LoadContainerRuntimeParams {
+    containerScope?: FluidObject;
+    context: IContainerContext;
+    existing: boolean;
+    provideEntryPoint: (containerRuntime: IContainerRuntime) => Promise<FluidObject>;
+    registryEntries: NamedFluidDataStoreRegistryEntries;
+    // @deprecated
+    requestHandler?: (request: IRequest, runtime: IContainerRuntime) => Promise<IResponse>;
+    runtimeOptions?: IContainerRuntimeOptions;
 }
 
 // @alpha @deprecated (undocumented)

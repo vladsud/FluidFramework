@@ -118,6 +118,8 @@ function normalizeMoveIds(change: SF.Changeset): SF.Changeset {
 	const revisionAllocator = createAlwaysFinalizedIdCompressor(
 		assertIsSessionId("00000000-0000-4000-b000-000000000000"),
 	);
+	const normalRevision = revisionAllocator.generateCompressedId();
+
 	// We have to keep the normalization of sources and destinations separate because we want to be able to normalize
 	// [{ MoveOut self: foo }, { MoveOut self: foo }]
 	// in a way that is equivalent to normalizing
@@ -131,9 +133,8 @@ function normalizeMoveIds(change: SF.Changeset): SF.Changeset {
 		const normalAtoms = target === CrossFieldTarget.Source ? normalSrcAtoms : normalDstAtoms;
 		const normal = tryGetFromNestedMap(normalAtoms, atom.revision, atom.localId);
 		if (normal === undefined) {
-			const newRevision = revisionAllocator.generateCompressedId();
 			const newId: ChangesetLocalId = brand(idAllocator.allocate());
-			const newAtom: ChangeAtomId = { revision: newRevision, localId: newId };
+			const newAtom: ChangeAtomId = { revision: normalRevision, localId: newId };
 			setInNestedMap(normalAtoms, atom.revision, atom.localId, newAtom);
 			return newAtom;
 		}
@@ -151,7 +152,6 @@ function normalizeMoveIds(change: SF.Changeset): SF.Changeset {
 
 	function normalizeEffect<TEffect extends MarkEffect>(effect: TEffect): TEffect {
 		switch (effect.type) {
-			case "Remove":
 			case "Rename":
 			case NoopMarkType:
 				return effect;
@@ -201,6 +201,18 @@ function normalizeMoveIds(change: SF.Changeset): SF.Changeset {
 				normalized.revision = atom.revision;
 				return normalized as TEffect;
 			}
+			case "Remove": {
+				const effectId = { revision: effect.revision, localId: effect.id };
+				const atom = normalizeAtom(effectId, CrossFieldTarget.Destination);
+				const normalized: Mutable<SF.Remove> = { ...effect };
+				if (normalized.idOverride === undefined) {
+					// Use the idOverride so we don't normalize the output cell ID
+					normalized.idOverride = effectId;
+				}
+				normalized.id = atom.localId;
+				normalized.revision = atom.revision;
+				return normalized as TEffect;
+			}
 			default:
 				fail(`Unexpected mark type: ${(effect as SF.Mark).type}`);
 		}
@@ -208,7 +220,15 @@ function normalizeMoveIds(change: SF.Changeset): SF.Changeset {
 	const output = new MarkListFactory();
 
 	for (const mark of change) {
-		output.push(normalizeMark(mark));
+		let nextMark: SF.Mark | undefined = mark;
+		while (nextMark !== undefined) {
+			let currMark: SF.Mark = nextMark;
+			nextMark = undefined;
+			if (currMark.count > 1) {
+				[currMark, nextMark] = splitMark(currMark, 1);
+			}
+			output.push(normalizeMark(currMark));
+		}
 	}
 	return output.list;
 }
@@ -429,11 +449,18 @@ function resetCrossFieldTable(table: CrossFieldTable) {
 	table.dstQueries.clear();
 }
 
-export function invertDeep(change: TaggedChange<WrappedChange>): WrappedChange {
-	return ChangesetWrapper.invert(change, (c) => invert(c));
+export function invertDeep(
+	change: TaggedChange<WrappedChange>,
+	revision: RevisionTag | undefined,
+): WrappedChange {
+	return ChangesetWrapper.invert(change, (c) => invert(c, revision), revision);
 }
 
-export function invert(change: TaggedChange<SF.Changeset>, isRollback = true): SF.Changeset {
+export function invert(
+	change: TaggedChange<SF.Changeset>,
+	revision: RevisionTag | undefined,
+	isRollback = true,
+): SF.Changeset {
 	deepFreeze(change.change);
 	const table = newCrossFieldTable();
 	let inverted = SF.invert(
@@ -441,6 +468,7 @@ export function invert(change: TaggedChange<SF.Changeset>, isRollback = true): S
 		isRollback,
 		// Sequence fields should not generate IDs during invert
 		fakeIdAllocator,
+		revision,
 		table,
 	);
 
@@ -453,6 +481,7 @@ export function invert(change: TaggedChange<SF.Changeset>, isRollback = true): S
 			isRollback,
 			// Sequence fields should not generate IDs during invert
 			fakeIdAllocator,
+			revision,
 			table,
 		);
 	}

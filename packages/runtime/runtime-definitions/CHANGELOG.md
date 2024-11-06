@@ -1,5 +1,57 @@
 # @fluidframework/runtime-definitions
 
+## 2.5.0
+
+### Minor Changes
+
+-   The op event on IFluidDataStoreRuntimeEvents and IContainerRuntimeBaseEvents is emitted at a different time ([#22840](https://github.com/microsoft/FluidFramework/pull/22840)) [2e5b969d3a](https://github.com/microsoft/FluidFramework/commit/2e5b969d3a28b05da1502d521b725cee66e36a15)
+
+    Previously, in versions 2.4 and below, the `op` event was emitted immediately after an op was processed and before the next op was processed.
+
+    In versions 2.5.0 and beyond, the `op` event will be emitted after an op is processed, but it may not be immediate. In addition, other ops in a
+    batch may be processed before the op event is emitted for a particular op.
+
+-   The process function on IFluidDataStoreChannel, IDeltaHandler, MockFluidDataStoreRuntime and MockDeltaConnection is now deprecated ([#22840](https://github.com/microsoft/FluidFramework/pull/22840)) [2e5b969d3a](https://github.com/microsoft/FluidFramework/commit/2e5b969d3a28b05da1502d521b725cee66e36a15)
+
+    The process function on IFluidDataStoreChannel, IDeltaHandler, MockFluidDataStoreRuntime and MockDeltaConnection is now
+    deprecated. It has been replaced with a new function `processMessages`, which will be called to process multiple messages instead of a single one on the channel. This is part of a feature called "Op bunching", where contiguous ops of a given type and to a given data store / DDS are bunched and sent together for processing.
+
+    Implementations of `IFluidDataStoreChannel` and `IDeltaHandler` must now also implement `processMessages`. For reference implementations, see `FluidDataStoreRuntime::processMessages` and `SharedObjectCore::attachDeltaHandler`.
+
+## 2.4.0
+
+Dependency updates only.
+
+## 2.3.0
+
+Dependency updates only.
+
+## 2.2.0
+
+### Minor Changes
+
+-   gcThrowOnTombstoneUsage and gcTombstoneEnforcementAllowed are deprecated ([#21992](https://github.com/microsoft/FluidFramework/pull/21992)) [b2bfed3a62](https://github.com/microsoft/FluidFramework/commit/b2bfed3a624d590d776c64a3317c60400b4b3e81)
+
+    These properties `gcThrowOnTombstoneUsage` and `gcTombstoneEnforcementAllowed` have been deprecated in
+    `IFluidParentContext` and `ContainerRuntime`. These were included in certain garbage collection (GC) telemetry to
+    identify whether the corresponding features have been enabled. These features are now enabled by default and this
+    information is added to the "GarbageCollectorLoaded" telemetry.
+
+    Also, the following Garbage collection runtime options and configs have been removed. They were added during GC feature
+    development to roll out and control functionalities. The corresponding features are on by default and can no longer be
+    disabled or controlled:
+
+    GC runtime options removed:
+
+    -   `gcDisableThrowOnTombstoneLoad`
+    -   `disableDataStoreSweep`
+
+    GC configs removed:
+
+    -   `"Fluid.GarbageCollection.DisableTombstone"`
+    -   `"Fluid.GarbageCollection.ThrowOnTombstoneUsage"`
+    -   `"Fluid.GarbageCollection.DisableDataStoreSweep"`
+
 ## 2.1.0
 
 Dependency updates only.

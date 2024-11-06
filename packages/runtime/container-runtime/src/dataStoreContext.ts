@@ -53,6 +53,8 @@ import {
 	SummarizeInternalFn,
 	channelsTreeName,
 	IInboundSignalMessage,
+	type IPendingMessagesState,
+	type IRuntimeMessageCollection,
 } from "@fluidframework/runtime-definitions/internal";
 import {
 	addBlobToSummary,
@@ -69,7 +71,6 @@ import {
 	tagCodeArtifacts,
 } from "@fluidframework/telemetry-utils/internal";
 
-import { sendGCUnexpectedUsageEvent } from "./gc/index.js";
 import {
 	// eslint-disable-next-line import/no-deprecated
 	ReadFluidDataStoreAttributes,
@@ -254,9 +255,15 @@ export abstract class FluidDataStoreContext
 	public get tombstoned() {
 		return this._tombstoned;
 	}
-	/** If true, throw an error when a tombstone data store is used. */
-	public readonly gcThrowOnTombstoneUsage: boolean;
-	public readonly gcTombstoneEnforcementAllowed: boolean;
+	/**
+	 * If true, throw an error when a tombstone data store is used.
+	 * @deprecated NOT SUPPORTED - hardcoded to return false since it's deprecated.
+	 */
+	public readonly gcThrowOnTombstoneUsage: boolean = false;
+	/**
+	 * @deprecated NOT SUPPORTED - hardcoded to return false since it's deprecated.
+	 */
+	public readonly gcTombstoneEnforcementAllowed: boolean = false;
 
 	/** If true, this means that this data store context and its children have been removed from the runtime */
 	protected deleted: boolean = false;
@@ -308,7 +315,7 @@ export abstract class FluidDataStoreContext
 	 * Returns the count of pending messages that are stored until the data store is realized.
 	 */
 	public get pendingCount(): number {
-		return this.pending?.length ?? 0;
+		return this.pendingMessagesState?.pendingCount ?? 0;
 	}
 
 	protected registry: IFluidDataStoreRegistry | undefined;
@@ -316,7 +323,11 @@ export abstract class FluidDataStoreContext
 	protected detachedRuntimeCreation = false;
 	protected channel: IFluidDataStoreChannel | undefined;
 	private loaded = false;
-	protected pending: ISequencedDocumentMessage[] | undefined = [];
+	/** Tracks the messages for this data store that are sent while it's not loaded */
+	private pendingMessagesState: IPendingMessagesState | undefined = {
+		messageCollections: [],
+		pendingCount: 0,
+	};
 	protected channelP: Promise<IFluidDataStoreChannel> | undefined;
 	protected _baseSnapshot: ISnapshotTree | undefined;
 	protected _attachState: AttachState;
@@ -394,9 +405,6 @@ export abstract class FluidDataStoreContext
 			FluidDataStoreContext.pendingOpsCountThreshold,
 			this.mc.logger,
 		);
-
-		this.gcThrowOnTombstoneUsage = this.parentContext.gcThrowOnTombstoneUsage;
-		this.gcTombstoneEnforcementAllowed = this.parentContext.gcTombstoneEnforcementAllowed;
 
 		// By default, a data store can log maximum 10 local changes telemetry in summarizer.
 		this.localChangesTelemetryCount =
@@ -559,33 +567,61 @@ export abstract class FluidDataStoreContext
 		this.channel!.setConnectionState(connected, clientId);
 	}
 
-	public process(
-		message: ISequencedDocumentMessage,
-		local: boolean,
-		localOpMetadata: unknown,
-	): void {
-		const safeTelemetryProps = extractSafePropertiesFromMessage(message);
-		// On op process, tombstone error is logged in garbage collector. So, set "checkTombstone" to false when calling
-		// "verifyNotClosed" which logs tombstone errors. Throw error if tombstoned and throwing on load is configured.
-		this.verifyNotClosed("process", false /* checkTombstone */, safeTelemetryProps);
-		if (this.tombstoned && this.gcThrowOnTombstoneUsage) {
-			throw DataProcessingError.create(
-				"Context is tombstoned! Call site [process]",
-				"process",
-				undefined /* sequencedMessage */,
-				safeTelemetryProps,
-			);
+	/**
+	 * back-compat ADO 21575: This is temporary and will be removed once the compat requirement across Runtime and
+	 * Datastore boundary is satisfied.
+	 * Process the messages to maintain backwards compatibility. The `processMessages` function is added to
+	 * IFluidDataStoreChannel in 2.5.0. For channels before that, call `process` for each message.
+	 */
+	private processMessagesCompat(
+		channel: IFluidDataStoreChannel,
+		messageCollection: IRuntimeMessageCollection,
+	) {
+		if (channel.processMessages !== undefined) {
+			channel.processMessages(messageCollection);
+		} else {
+			const { envelope, messagesContent, local } = messageCollection;
+			for (const { contents, localOpMetadata, clientSequenceNumber } of messagesContent) {
+				channel.process(
+					{ ...envelope, contents, clientSequenceNumber },
+					local,
+					localOpMetadata,
+				);
+			}
 		}
+	}
 
-		this.summarizerNode.recordChange(message);
+	/**
+	 * Process messages for this data store. The messages here are contiguous messages for this data store in a batch.
+	 * @param messageCollection - The collection of messages to process.
+	 */
+	public processMessages(messageCollection: IRuntimeMessageCollection): void {
+		const { envelope, messagesContent, local } = messageCollection;
+		const safeTelemetryProps = extractSafePropertiesFromMessage(envelope);
+		// Tombstone error is logged in garbage collector. So, set "checkTombstone" to false when calling
+		// "verifyNotClosed" which logs tombstone errors.
+		this.verifyNotClosed("process", false /* checkTombstone */, safeTelemetryProps);
+
+		this.summarizerNode.recordChange(envelope as ISequencedDocumentMessage);
 
 		if (this.loaded) {
-			return this.channel?.process(message, local, localOpMetadata);
+			assert(this.channel !== undefined, 0xa68 /* Channel is not loaded */);
+			this.processMessagesCompat(this.channel, messageCollection);
 		} else {
 			assert(!local, 0x142 /* "local store channel is not loaded" */);
-			assert(this.pending !== undefined, 0x23d /* "pending is undefined" */);
-			this.pending.push(message);
-			this.thresholdOpsCounter.sendIfMultiple("StorePendingOps", this.pending.length);
+			assert(
+				this.pendingMessagesState !== undefined,
+				0xa69 /* pending messages queue is undefined */,
+			);
+			this.pendingMessagesState.messageCollections.push({
+				...messageCollection,
+				messagesContent: Array.from(messagesContent),
+			});
+			this.pendingMessagesState.pendingCount += messagesContent.length;
+			this.thresholdOpsCounter.sendIfMultiple(
+				"StorePendingOps",
+				this.pendingMessagesState.pendingCount,
+			);
 		}
 	}
 
@@ -794,20 +830,21 @@ export abstract class FluidDataStoreContext
 	}
 
 	protected processPendingOps(channel: IFluidDataStoreChannel) {
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-		const pending = this.pending!;
+		const baseSequenceNumber = this.baseSnapshotSequenceNumber ?? -1;
 
-		// Apply all pending ops
-		for (const op of pending) {
+		assert(
+			this.pendingMessagesState !== undefined,
+			0xa6a /* pending messages queue is undefined */,
+		);
+		for (const messageCollection of this.pendingMessagesState.messageCollections) {
 			// Only process ops whose seq number is greater than snapshot sequence number from which it loaded.
-			const seqNumber = this.baseSnapshotSequenceNumber ?? -1;
-			if (op.sequenceNumber > seqNumber) {
-				channel.process(op, false, undefined /* localOpMetadata */);
+			if (messageCollection.envelope.sequenceNumber > baseSequenceNumber) {
+				this.processMessagesCompat(channel, messageCollection);
 			}
 		}
-		this.pending = undefined;
 
-		this.thresholdOpsCounter.send("ProcessPendingOps", pending.length);
+		this.thresholdOpsCounter.send("ProcessPendingOps", this.pendingMessagesState.pendingCount);
+		this.pendingMessagesState = undefined;
 	}
 
 	protected completeBindingRuntime(channel: IFluidDataStoreChannel) {
@@ -953,20 +990,14 @@ export abstract class FluidDataStoreContext
 				safeTelemetryProps,
 			);
 
-			sendGCUnexpectedUsageEvent(
-				this.mc,
+			this.mc.logger.sendTelemetryEvent(
 				{
 					eventName: "GC_Tombstone_DataStore_Changed",
-					category: this.gcThrowOnTombstoneUsage ? "error" : "generic",
-					gcTombstoneEnforcementAllowed: this.gcTombstoneEnforcementAllowed,
+					category: "generic",
 					callSite,
 				},
-				this.pkg,
 				error,
 			);
-			if (this.gcThrowOnTombstoneUsage) {
-				throw error;
-			}
 		}
 	}
 
@@ -990,7 +1021,7 @@ export abstract class FluidDataStoreContext
 			eventName,
 			type,
 			isSummaryInProgress: this.summarizerNode.isSummaryInProgress?.(),
-			stack: generateStack(),
+			stack: generateStack(30),
 		});
 		this.localChangesTelemetryCount--;
 	}
@@ -1045,9 +1076,6 @@ export class RemoteFluidDataStoreContext extends FluidDataStoreContext {
 		} else {
 			this._baseSnapshot = props.snapshot;
 			this.isSnapshotInISnapshotFormat = false;
-		}
-		if (this._baseSnapshot !== undefined) {
-			this.summarizerNode.updateBaseSummaryState(this._baseSnapshot);
 		}
 	}
 
@@ -1332,16 +1360,10 @@ export class LocalFluidDataStoreContextBase extends FluidDataStoreContext {
 	 */
 	public delete() {
 		// TODO: GC:Validation - potentially prevent this from happening or asserting. Maybe throw here.
-		sendGCUnexpectedUsageEvent(
-			this.mc,
-			{
-				eventName: "GC_Deleted_DataStore_Unexpected_Delete",
-				message: "Unexpected deletion of a local data store context",
-				category: "error",
-				gcTombstoneEnforcementAllowed: undefined,
-			},
-			this.pkg,
-		);
+		this.mc.logger.sendErrorEvent({
+			eventName: "GC_Deleted_DataStore_Unexpected_Delete",
+			message: "Unexpected deletion of a local data store context",
+		});
 		super.delete();
 	}
 }
