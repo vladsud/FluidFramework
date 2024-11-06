@@ -4397,8 +4397,11 @@ importers:
   examples/service-clients/odsp-client/shared-tree-demo:
     dependencies:
       '@azure/msal-browser':
-        specifier: ^3.25.0
-        version: 3.25.0
+        specifier: ^2.34.0
+        version: 2.39.0
+      '@fluidframework/core-utils':
+        specifier: workspace:~
+        version: link:../../../../packages/common/core-utils
       '@fluidframework/odsp-client':
         specifier: workspace:~
         version: link:../../../../packages/service-clients/odsp-client
@@ -16577,11 +16580,23 @@ packages:
     dependencies:
       tslib: 2.7.0
 
+  /@azure/msal-browser@2.39.0:
+    resolution: {integrity: sha512-kks/n2AJzKUk+DBqZhiD+7zeQGBl+WpSOQYzWy6hff3bU0ZrYFqr4keFLlzB5VKuKZog0X59/FGHb1RPBDZLVg==}
+    engines: {node: '>=0.8.0'}
+    dependencies:
+      '@azure/msal-common': 13.3.3
+    dev: false
+
   /@azure/msal-browser@3.25.0:
     resolution: {integrity: sha512-a0Y7pmSy8SC1s9bvwr+REvyAA1nQcITlZvkElM2gNUPYFTTNUTEdcpg73TmawNucyMdZ9xb/GFcuhrLOqYAzwg==}
     engines: {node: '>=0.8.0'}
     dependencies:
       '@azure/msal-common': 14.15.0
+
+  /@azure/msal-common@13.3.3:
+    resolution: {integrity: sha512-n278DdCXKeiWhLwhEL7/u9HRMyzhUXLefeajiknf6AmEedoiOiv2r5aRJ7LXdT3NGPyubkdIbthaJlVtmuEqvA==}
+    engines: {node: '>=0.8.0'}
+    dev: false
 
   /@azure/msal-common@14.15.0:
     resolution: {integrity: sha512-ImAQHxmpMneJ/4S8BRFhjt1MZ3bppmpRPYYNyzeQPeFN288YKbb8TmmISQEbtfkQ1BPASvYZU5doIZOPBAqENQ==}

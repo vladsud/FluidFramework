@@ -82,12 +82,12 @@ export interface OdspClientProps {
 }
 
 /**
- * Argument type of IFluidContainer.attach() for containers created by IOdspClient
  * Specifies location / name of the file.
  * If no argument is provided, file with random name (uuid) will be created.
+ * Please see {@link OdspContainerAttachFunctor} for more details
  * @alpha
  */
-export type OdspContainerAttachRequest =
+export type OdspContainerAttachArgs =
 	| {
 			/**
 			 * The file path where Fluid containers are created. If undefined, the file is created at the root.
@@ -114,7 +114,8 @@ export type OdspContainerAttachRequest =
 	  };
 
 /**
- * An object type returned by IOdspFluidContainer.attach() call. *
+ * An object type returned by attach call.
+ * Please see {@link OdspContainerAttachFunctor} for more details
  * @alpha
  */
 export interface OdspContainerAttachResult {
@@ -124,21 +125,22 @@ export interface OdspContainerAttachResult {
 	itemId: string;
 
 	/**
-	 * If OdspContainerAttachRequest.createShareLinkType was provided at the time of IOdspFluidContainer.attach() call,
-	 * this value will contain sharing link information for created file.
+	 * If OdspContainerAttachArgs.createShareLinkType was provided as part of OdspContainerAttachArgs payload,
+	 * `shareLinkInfo` will contain sharing link information for created file.
 	 */
 	shareLinkInfo?: ShareLinkInfoType;
 }
 
 /**
- * IFluidContainer.attach() function signature for IOdspClient
+ * Signature of the createFn callback returned by IOdspClient.createContainer().
+ * Used to attach container to stroage (create container in storage).
  * @param param - Specifies where file should be created and how it should be named. If not provided,
  * file with random name (uuid) will be created in the root of the drive.
  * @param options - options controlling creation.
  * @alpha
  */
-export type OdspContainerAttachType = (
-	param?: OdspContainerAttachRequest,
+export type OdspContainerAttachFunctor = (
+	param?: OdspContainerAttachArgs,
 ) => Promise<OdspContainerAttachResult>;
 
 /**
@@ -148,7 +150,7 @@ export type OdspContainerAttachType = (
 export interface OdspContainerOpenOptions {
 	/**
 	 * A sharing link could be provided to identify a file. This link has to be in very specific format - see
-	 * OdspContainerAttachResult.sharingLink, result of calling IOdspFluidContainer.
+	 * OdspContainerAttachResult.sharingLink.
 	 * When sharing link is provided, it uniquely identifies a file in Sharepoint - OdspConnectionConfig information
 	 * (part of OdspClientProps.connection provided to createOdspClient()) is ignored in such case.
 	 *
@@ -170,7 +172,7 @@ export interface OdspContainerOpenOptions {
  * FluidContainer is persisted in the backend and consumed by users. Any functionality regarding
  * how the data is handled within the FluidContainer itself, i.e. which data objects or DDSes to
  * use, will not be included here but rather on the FluidContainer class itself.
- * @alpha
+ * @beta
  */
 export interface OdspContainerServices {
 	/**
@@ -183,7 +185,7 @@ export interface OdspContainerServices {
  * Since ODSP provides user names and email for all of its members, we extend the
  * {@link @fluidframework/fluid-static#IMember} interface to include this service-specific value.
  * It will be returned for all audience members connected.
- * @alpha
+ * @beta
  */
 export interface OdspMember extends IMember {
 	/**
@@ -202,7 +204,7 @@ export interface OdspMember extends IMember {
 
 /**
  * Audience object for ODSP containers
- * @alpha
+ * @beta
  */
 export type IOdspAudience = IServiceAudience<OdspMember>;
 
@@ -224,13 +226,6 @@ export interface TokenResponse {
 }
 
 /**
- * Fluid Container type
- * @alpha
- */
-export type IOdspFluidContainer<TContainerSchema extends ContainerSchema = ContainerSchema> =
-	IFluidContainer<TContainerSchema, OdspContainerAttachType>;
-
-/**
  * IOdspClient provides the ability to manipulate Fluid containers backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
  * @alpha
  */
@@ -242,8 +237,9 @@ export interface IOdspClient {
 	createContainer<T extends ContainerSchema>(
 		containerSchema: T,
 	): Promise<{
-		container: IOdspFluidContainer<T>;
+		container: IFluidContainer<T>;
 		services: OdspContainerServices;
+		createFn: OdspContainerAttachFunctor;
 	}>;
 
 	/**
@@ -258,7 +254,7 @@ export interface IOdspClient {
 		containerSchema: T,
 		options?: OdspContainerOpenOptions,
 	): Promise<{
-		container: IOdspFluidContainer<T>;
+		container: IFluidContainer<T>;
 		services: OdspContainerServices;
 	}>;
 }
