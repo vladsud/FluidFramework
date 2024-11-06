@@ -61,7 +61,7 @@ export namespace ConnectionStateType {
 // @public
 export type ConnectionStateType = ConnectionStateType.Disconnected | ConnectionStateType.EstablishingConnection | ConnectionStateType.CatchingUp | ConnectionStateType.Connected;
 
-// @public
+// @public @deprecated
 export type ContainerAttachProps<T = unknown> = T;
 
 // @public
@@ -349,7 +349,7 @@ export type IEventTransformer<TThis, TEvent extends IEvent> = TEvent extends {
 
 // @public @sealed
 export interface IFluidContainer<TContainerSchema extends ContainerSchema = ContainerSchema> extends IEventProvider<IFluidContainerEvents> {
-    attach(props?: ContainerAttachProps): Promise<string>;
+    attach(): Promise<string>;
     readonly attachState: AttachState;
     connect(): void;
     readonly connectionState: ConnectionStateType;

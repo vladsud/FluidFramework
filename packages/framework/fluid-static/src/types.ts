@@ -60,6 +60,7 @@ export interface DataObjectClass<T extends IFluidLoadable> {
 /**
  * Represents properties that can be attached to a container.
  * @public
+ * @deprecated - not used.
  */
 export type ContainerAttachProps<T = unknown> = T;
 

@@ -3,10 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import type { IFluidContainer } from "fluid-framework";
+// eslint-disable-next-line import/no-internal-modules
 import { assert } from "@fluidframework/core-utils/internal";
 // eslint-disable-next-line import/no-internal-modules
 import { OdspContainerAttachFunctor } from "@fluidframework/odsp-client/internal";
+import type { IFluidContainer } from "fluid-framework";
 import React from "react";
 import ReactDOM from "react-dom";
 

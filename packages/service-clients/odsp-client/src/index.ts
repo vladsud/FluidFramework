@@ -16,6 +16,7 @@
 export type {
 	OdspConnectionConfig,
 	OdspClientProps,
+	OdspClientPropsEx,
 	OdspContainerServices,
 	IOdspAudience,
 	OdspMember,
@@ -24,6 +25,12 @@ export type {
 	OdspContainerAttachFunctor,
 	OdspContainerAttachResult,
 	OdspContainerOpenOptions,
+	IOdspClient,
 } from "./interfaces.js";
-export { OdspClient } from "./odspClient.js";
+export {
+	OdspClient,
+	createOdspClient,
+	createOdspClientEx,
+	type OdspSiteLocation,
+} from "./odspClient.js";
 export { type IOdspTokenProvider } from "./token.js";

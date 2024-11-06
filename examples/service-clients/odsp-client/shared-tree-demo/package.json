@@ -35,6 +35,7 @@
 	},
 	"dependencies": {
 		"@azure/msal-browser": "^3.25.0",
+		"@fluidframework/core-utils": "workspace:~",
 		"@fluidframework/odsp-client": "workspace:~",
 		"@fluidframework/odsp-doclib-utils": "workspace:~",
 		"css-loader": "^7.1.2",

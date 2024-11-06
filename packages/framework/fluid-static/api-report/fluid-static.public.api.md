@@ -7,7 +7,7 @@
 // @public
 export type CompatibilityMode = "1" | "2";
 
-// @public
+// @public @deprecated
 export type ContainerAttachProps<T = unknown> = T;
 
 // @public
@@ -24,7 +24,7 @@ export interface IConnection {
 
 // @public @sealed
 export interface IFluidContainer<TContainerSchema extends ContainerSchema = ContainerSchema> extends IEventProvider<IFluidContainerEvents> {
-    attach(props?: ContainerAttachProps): Promise<string>;
+    attach(): Promise<string>;
     readonly attachState: AttachState;
     connect(): void;
     readonly connectionState: ConnectionState;

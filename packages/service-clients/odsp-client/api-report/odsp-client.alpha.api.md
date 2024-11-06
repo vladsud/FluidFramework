@@ -4,8 +4,27 @@
 
 ```ts
 
+// @alpha
+export function createOdspClient(properties: OdspClientPropsEx): IOdspClient;
+
+// @alpha
+export function createOdspClientEx(driverFactory: IDocumentServiceFactory, connectionConfig: OdspSiteLocation, logger?: ITelemetryBaseLogger, configProvider?: IConfigProviderBase): IOdspClient;
+
 // @beta
 export type IOdspAudience = IServiceAudience<OdspMember>;
+
+// @alpha
+export interface IOdspClient {
+    createContainer<T extends ContainerSchema>(containerSchema: T): Promise<{
+        container: IFluidContainer<T>;
+        services: OdspContainerServices;
+        createFn: OdspContainerAttachFunctor;
+    }>;
+    getContainer<T extends ContainerSchema>(itemId: string, containerSchema: T, options?: OdspContainerOpenOptions): Promise<{
+        container: IFluidContainer<T>;
+        services: OdspContainerServices;
+    }>;
+}
 
 // @beta
 export interface IOdspTokenProvider {
@@ -22,7 +41,7 @@ export class OdspClient {
         services: OdspContainerServices;
     }>;
     // (undocumented)
-    getContainer<T extends ContainerSchema>(id: string, containerSchema: T): Promise<{
+    getContainer<T extends ContainerSchema>(itemId: string, containerSchema: T): Promise<{
         container: IFluidContainer<T>;
         services: OdspContainerServices;
     }>;
@@ -35,12 +54,42 @@ export interface OdspClientProps {
     readonly logger?: ITelemetryBaseLogger;
 }
 
+// @alpha (undocumented)
+export interface OdspClientPropsEx extends OdspClientProps {
+    readonly hostPolicy?: HostStoragePolicy;
+    readonly persistedCache?: IPersistedCache;
+}
+
 // @beta
 export interface OdspConnectionConfig {
     driveId: string;
-    filePath: string;
+    isClpCompliant?: boolean;
     siteUrl: string;
     tokenProvider: IOdspTokenProvider;
+}
+
+// @alpha
+export type OdspContainerAttachArgs = {
+    filePath?: string;
+    fileName?: string;
+    createShareLinkType?: ISharingLinkKind;
+} | {
+    itemId: string;
+};
+
+// @alpha
+export type OdspContainerAttachFunctor = (param?: OdspContainerAttachArgs) => Promise<OdspContainerAttachResult>;
+
+// @alpha
+export interface OdspContainerAttachResult {
+    itemId: string;
+    shareLinkInfo?: ShareLinkInfoType;
+}
+
+// @alpha
+export interface OdspContainerOpenOptions {
+    fileVersion?: string;
+    sharingLinkToRedeem?: string;
 }
 
 // @beta
@@ -54,6 +103,9 @@ export interface OdspMember extends IMember {
     id: string;
     name: string;
 }
+
+// @alpha (undocumented)
+export type OdspSiteLocation = Omit<OdspConnectionConfig, "tokenProvider">;
 
 // @beta
 export interface TokenResponse {

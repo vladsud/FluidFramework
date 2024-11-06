@@ -46,6 +46,7 @@ import { v4 as uuid } from "uuid";
 import type {
 	TokenResponse,
 	OdspClientProps,
+	OdspClientPropsEx,
 	OdspContainerAttachArgs,
 	OdspContainerAttachFunctor,
 	OdspContainerServices,
@@ -57,7 +58,10 @@ import type {
 import { createOdspAudienceMember } from "./odspAudience.js";
 import type { IOdspTokenProvider } from "./token.js";
 
-type OdspSiteLocation = Omit<OdspConnectionConfig, "tokenProvider">;
+/**
+ * @alpha
+ */
+export type OdspSiteLocation = Omit<OdspConnectionConfig, "tokenProvider">;
 
 async function getStorageToken(
 	options: OdspResourceTokenFetchOptions,
@@ -137,14 +141,15 @@ class OdspFileCreateUrlResolver implements IUrlResolver {
  * @param logger - (options) logger to use
  * @param configProvider - (optional) overwrires
  * @returns IOdspClient
+ * @alpha
  */
-function createOdspClientCore(
+export function createOdspClientEx(
 	driverFactory: IDocumentServiceFactory,
 	connectionConfig: OdspSiteLocation,
 	logger?: ITelemetryBaseLogger,
 	configProvider?: IConfigProviderBase,
 ): IOdspClient {
-	return new OdspClient(driverFactory, connectionConfig, logger, configProvider);
+	return new OdspClientEx(driverFactory, connectionConfig, logger, configProvider);
 }
 
 /**
@@ -153,8 +158,8 @@ function createOdspClientCore(
  * @returns IOdspClient
  * @alpha
  */
-export function createOdspClient(properties: OdspClientProps): IOdspClient {
-	return createOdspClientCore(
+export function createOdspClient(properties: OdspClientPropsEx): IOdspClient {
+	return createOdspClientEx(
 		new OdspDocumentServiceFactory(
 			async (options) => getStorageToken(options, properties.connection.tokenProvider),
 			async (options) => getWebsocketToken(options, properties.connection.tokenProvider),
@@ -168,9 +173,10 @@ export function createOdspClient(properties: OdspClientProps): IOdspClient {
 }
 
 /**
- * OdspClient provides the ability to have a Fluid object backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
+ * OdspClientCore provides the ability to have a Fluid object backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
+ * @sealed
  */
-class OdspClient implements IOdspClient {
+class OdspClientCore implements IOdspClient {
 	private readonly configProvider: IConfigProviderBase;
 
 	public constructor(
@@ -203,7 +209,7 @@ class OdspClient implements IOdspClient {
 			rootDataObject,
 		});
 
-		const createFn = OdspClient.createContainerAttachCallback(
+		const createFn = OdspClientCore.createContainerAttachCallback(
 			container,
 			this.connectionConfig,
 			resolver,
@@ -358,5 +364,61 @@ class OdspClient implements IOdspClient {
 			0x878 /* entryPoint must be of type IRootDataObject */,
 		);
 		return rootDataObject.IRootDataObject;
+	}
+}
+
+/**
+ * OdspClient provides the ability to have a Fluid object backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
+ * @sealed
+ * @beta
+ */
+export class OdspClient {
+	private readonly impl: OdspClientCore;
+
+	public constructor(properties: OdspClientProps) {
+		const factory = new OdspDocumentServiceFactory(
+			async (options) => getStorageToken(options, properties.connection.tokenProvider),
+			async (options) => getWebsocketToken(options, properties.connection.tokenProvider),
+		);
+		this.impl = new OdspClientCore(
+			factory,
+			properties.connection,
+			properties.logger,
+			properties.configProvider,
+		);
+	}
+
+	public async createContainer<T extends ContainerSchema>(
+		containerSchema: T,
+	): Promise<{
+		container: IFluidContainer<T>;
+		services: OdspContainerServices;
+	}> {
+		return this.impl.createContainer(containerSchema);
+	}
+
+	public async getContainer<T extends ContainerSchema>(
+		itemId: string,
+		containerSchema: T,
+	): Promise<{
+		container: IFluidContainer<T>;
+		services: OdspContainerServices;
+	}> {
+		return this.impl.getContainer(itemId, containerSchema);
+	}
+}
+
+/**
+ * OdspClientEx provides the ability to have a Fluid object backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
+ * @sealed
+ */
+class OdspClientEx extends OdspClientCore {
+	public constructor(
+		documentServiceFactory: IDocumentServiceFactory,
+		connectionConfig: OdspSiteLocation,
+		logger?: ITelemetryBaseLogger,
+		configProvider?: IConfigProviderBase,
+	) {
+		super(documentServiceFactory, connectionConfig, logger, configProvider);
 	}
 }

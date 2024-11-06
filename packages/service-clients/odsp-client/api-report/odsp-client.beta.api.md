@@ -22,7 +22,7 @@ export class OdspClient {
         services: OdspContainerServices;
     }>;
     // (undocumented)
-    getContainer<T extends ContainerSchema>(id: string, containerSchema: T): Promise<{
+    getContainer<T extends ContainerSchema>(itemId: string, containerSchema: T): Promise<{
         container: IFluidContainer<T>;
         services: OdspContainerServices;
     }>;
@@ -38,7 +38,7 @@ export interface OdspClientProps {
 // @beta
 export interface OdspConnectionConfig {
     driveId: string;
-    filePath: string;
+    isClpCompliant?: boolean;
     siteUrl: string;
     tokenProvider: IOdspTokenProvider;
 }

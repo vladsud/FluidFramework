@@ -52,7 +52,7 @@ export interface OdspConnectionConfig {
 }
 
 /**
- * @alpha
+ * @beta
  */
 export interface OdspClientProps {
 	/**
@@ -69,7 +69,12 @@ export interface OdspClientProps {
 	 * Base interface for providing configurations to control experimental features. If unsure, leave this undefined.
 	 */
 	readonly configProvider?: IConfigProviderBase;
+}
 
+/**
+ * @alpha
+ */
+export interface OdspClientPropsEx extends OdspClientProps {
 	/**
 	 * Optional. This interface can be implemented by the host to provide durable caching across sessions.
 	 */
