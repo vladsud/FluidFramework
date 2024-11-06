@@ -18,7 +18,7 @@ import type {
 	// ShareLinkInfoType,
 	IPersistedCache,
 	HostStoragePolicy,
-	IOdspCreateFileLocation,
+	IOdspCreateContainerLocation,
 } from "@fluidframework/odsp-driver-definitions/internal";
 
 import type { IOdspTokenProvider } from "./token.js";
@@ -44,15 +44,10 @@ export interface OdspConnectionConfig {
 	 * SharePoint Embedded Container Id of the tenant where Fluid containers are created
 	 */
 	driveId: string;
-
-	/**
-	 * Should be set to true only by application that is CLP compliant, for CLP compliant workflow.
-	 * This argument has no impact if application is not properly registered with Sharepoint.
-	 */
-	isClpCompliant?: boolean;
 }
 
 /**
+ * Property bag supplied at the time OdspClient is created. These properties control OdspClient behavior
  * @beta
  */
 export interface OdspClientProps {
@@ -73,6 +68,7 @@ export interface OdspClientProps {
 }
 
 /**
+ * Similar to OdspClientProps, but provides more control over behavior of OdspClient
  * @alpha
  */
 export interface OdspClientPropsEx extends OdspClientProps {
@@ -85,16 +81,24 @@ export interface OdspClientPropsEx extends OdspClientProps {
 	 * Optional. Defines various policies controlling behavior of ODSP driver
 	 */
 	readonly hostPolicy?: HostStoragePolicy;
+
+	/**
+	 * Should be set to true only by application that is CLP compliant, for CLP compliant workflow.
+	 * This argument has no impact if application is not properly registered with Sharepoint.
+	 */
+	isClpCompliant?: boolean;
 }
 
 /**
- * An object type returned by attach call.
+ * An object type returned by container attach call.
  * Please see {@link OdspContainerAttachFunctor} for more details
  * @alpha
  */
 export interface OdspContainerAttachResult {
 	/**
-	 * An ID of the document created. This ID could be passed to future IOdspClient.getContainer() call
+	 * An ID hosting Fluid Container data. Usually, container attachment process results in a new file
+	 * being created to store Fluid container.
+	 * This ID could be passed to future IOdspClient.getContainer() call
 	 */
 	itemId: string;
 }
@@ -108,7 +112,7 @@ export interface OdspContainerAttachResult {
  * @alpha
  */
 export type OdspContainerAttachFunctor = (
-	fileLocation?: IOdspCreateFileLocation,
+	fileLocation?: IOdspCreateContainerLocation,
 ) => Promise<OdspContainerAttachResult>;
 
 /**
@@ -200,6 +204,9 @@ export interface TokenResponse {
 export interface IOdspClient {
 	/**
 	 * Creates a new container in memory. Calling attach() on returned container will create container in storage.
+	 * You can either leverage `createFn` property or IFluidContainer.attach() in order to create Fluid container in storage.
+	 * The latter allows only creation of a new file with random name in the root of the drive.
+	 * The former method provides more customizations, including controlling where file is created and how it is named.
 	 * @param containerSchema - schema of the created container
 	 */
 	createContainer<T extends ContainerSchema>(

@@ -238,11 +238,11 @@ export interface IOdspOpenArgs {
 /**
  * Microsoft internal only! Can be used only by Microsoft applications.
  * An input for the driver to create FF partition on existing file.
- * Creates alternate partition with FF content.
+ * Creates alternate partition (in existing file) with FF content.
  * Can be only used for a files that provisioned to support FF protocol on alternate partitions.
  * @alpha
  */
-export interface IOdspCreateAltPartition {
+export interface IOdspCreateContainerUsingAltPartition {
 	/**
 	 * {@link (IOdspUrlParts:interface).itemId}
 	 */
@@ -253,7 +253,7 @@ export interface IOdspCreateAltPartition {
  * An inputs for the driver to create FF partition on existing file.
  * @alpha
  */
-export interface IOdspCreateNewFile {
+export interface IOdspCreateContainerUsingNewFile {
 	/**
 	 * Path to a file within site. If not provided, files will be created in the root of the collection.
 	 */
@@ -272,13 +272,15 @@ export interface IOdspCreateNewFile {
  * Fluid container could be created via creating new file, or via creating alternate partition within existing file.
  * @alpha
  */
-export type IOdspCreateFileLocation = IOdspCreateAltPartition | IOdspCreateNewFile;
+export type IOdspCreateContainerLocation =
+	| IOdspCreateContainerUsingAltPartition
+	| IOdspCreateContainerUsingNewFile;
 
 /**
  * A set of inputs for the driver to create a new file or a FF partition on existing file.
  * @alpha
  */
-export interface IOdspCreateArgs {
+export interface IOdspCreateContainerParams {
 	/**
 	 * {@inheritDoc (IOdspUrlParts:interface).siteUrl}
 	 */
@@ -289,7 +291,7 @@ export interface IOdspCreateArgs {
 	 */
 	driveId: string;
 
-	fileLocation: IOdspCreateFileLocation;
+	fileLocation: IOdspCreateContainerLocation;
 
 	/**
 	 * {@inheritDoc (IOdspResolvedUrl:interface).isClpCompliantApp}

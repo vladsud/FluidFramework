@@ -38,8 +38,8 @@ import {
 import type {
 	OdspResourceTokenFetchOptions,
 	IOdspOpenArgs,
-	IOdspCreateArgs,
-	IOdspCreateFileLocation,
+	IOdspCreateContainerParams,
+	IOdspCreateContainerLocation,
 } from "@fluidframework/odsp-driver-definitions/internal";
 import { wrapConfigProviderWithDefaults } from "@fluidframework/telemetry-utils/internal";
 import { v4 as uuid } from "uuid";
@@ -115,11 +115,11 @@ class OdspFileOpenUrlResolver implements IUrlResolver {
 }
 
 class OdspFileCreateUrlResolver implements IUrlResolver {
-	private input?: IOdspCreateArgs;
+	private input?: IOdspCreateContainerParams;
 
 	public constructor() {}
 
-	public update(input: IOdspCreateArgs): void {
+	public update(input: IOdspCreateContainerParams): void {
 		assert(this.input === undefined, "Can update only once");
 		this.input = input;
 	}
@@ -146,10 +146,17 @@ class OdspFileCreateUrlResolver implements IUrlResolver {
 export function createOdspClientEx(
 	driverFactory: IDocumentServiceFactory,
 	connectionConfig: OdspSiteLocation,
+	isClpCompliant?: boolean,
 	logger?: ITelemetryBaseLogger,
 	configProvider?: IConfigProviderBase,
 ): IOdspClient {
-	return new OdspClientEx(driverFactory, connectionConfig, logger, configProvider);
+	return new OdspClientEx(
+		driverFactory,
+		connectionConfig,
+		isClpCompliant,
+		logger,
+		configProvider,
+	);
 }
 
 /**
@@ -167,6 +174,7 @@ export function createOdspClient(properties: OdspClientPropsEx): IOdspClient {
 			properties.hostPolicy,
 		),
 		properties.connection,
+		properties.isClpCompliant,
 		properties.logger,
 		properties.configProvider,
 	);
@@ -182,6 +190,7 @@ class OdspClientCore implements IOdspClient {
 	public constructor(
 		private readonly documentServiceFactory: IDocumentServiceFactory,
 		protected readonly connectionConfig: OdspSiteLocation,
+		protected readonly isClpCompliant = false,
 		private readonly logger?: ITelemetryBaseLogger,
 		configProvider?: IConfigProviderBase,
 	) {
@@ -212,6 +221,7 @@ class OdspClientCore implements IOdspClient {
 		const createFn = OdspClientCore.createContainerAttachCallback(
 			container,
 			this.connectionConfig,
+			this.isClpCompliant,
 			resolver,
 		);
 
@@ -245,7 +255,7 @@ class OdspClientCore implements IOdspClient {
 
 			sharingLinkToRedeem: options?.sharingLinkToRedeem,
 
-			isClpCompliantApp: this.connectionConfig.isClpCompliant === true,
+			isClpCompliantApp: this.isClpCompliant === true,
 		};
 
 		const loader = this.createLoader(
@@ -300,12 +310,15 @@ class OdspClientCore implements IOdspClient {
 	private static createContainerAttachCallback(
 		container: IContainer,
 		connectionConfig: OdspSiteLocation,
+		isClpCompliantApp: boolean,
 		resolver: OdspFileCreateUrlResolver,
 	): OdspContainerAttachFunctor {
 		/**
 		 * See {@link FluidContainer.attach}
 		 */
-		return async (odspProps?: IOdspCreateFileLocation): Promise<OdspContainerAttachResult> => {
+		return async (
+			odspProps?: IOdspCreateContainerLocation,
+		): Promise<OdspContainerAttachResult> => {
 			if (container.attachState !== AttachState.Detached) {
 				throw new Error("Cannot attach container. Container is not in detached state");
 			}
@@ -313,7 +326,7 @@ class OdspClientCore implements IOdspClient {
 			const base = {
 				siteUrl: connectionConfig.siteUrl,
 				driveId: connectionConfig.driveId,
-				isClpCompliantApp: connectionConfig.isClpCompliant === true,
+				isClpCompliantApp,
 			};
 			const fileLocation =
 				odspProps !== undefined && "itemId" in odspProps
@@ -325,7 +338,7 @@ class OdspClientCore implements IOdspClient {
 							fileName: odspProps?.fileName ?? uuid(),
 						};
 
-			const resolved: IOdspCreateArgs = { ...base, fileLocation };
+			const resolved: IOdspCreateContainerParams = { ...base, fileLocation };
 
 			resolver.update(resolved);
 
@@ -380,6 +393,7 @@ export class OdspClient {
 		this.impl = new OdspClientCore(
 			factory,
 			properties.connection,
+			false, // isClpCompliant
 			properties.logger,
 			properties.configProvider,
 		);
@@ -413,9 +427,10 @@ class OdspClientEx extends OdspClientCore {
 	public constructor(
 		documentServiceFactory: IDocumentServiceFactory,
 		connectionConfig: OdspSiteLocation,
+		isClpCompliant?: boolean,
 		logger?: ITelemetryBaseLogger,
 		configProvider?: IConfigProviderBase,
 	) {
-		super(documentServiceFactory, connectionConfig, logger, configProvider);
+		super(documentServiceFactory, connectionConfig, isClpCompliant, logger, configProvider);
 	}
 }

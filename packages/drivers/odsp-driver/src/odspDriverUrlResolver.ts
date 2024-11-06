@@ -15,7 +15,7 @@ import { NonRetryableError } from "@fluidframework/driver-utils/internal";
 import {
 	IOdspResolvedUrl,
 	IOdspOpenArgs,
-	IOdspCreateArgs,
+	IOdspCreateContainerParams,
 	OdspErrorTypes,
 	SharingLinkRole,
 	SharingLinkScope,
@@ -177,14 +177,16 @@ export async function createOpenOdspResolvedUrl(
  * @returns IOdspResolvedUrl
  * @alpha
  */
-export function createCreateOdspResolvedUrl(input: IOdspCreateArgs): IOdspResolvedUrl {
+export function createCreateOdspResolvedUrl(
+	input: IOdspCreateContainerParams,
+): IOdspResolvedUrl {
 	const {
 		siteUrl,
 		itemId = "",
 		fileName = "",
 		filePath = "",
 		createShareLinkType,
-	} = input as IOdspCreateArgs & {
+	} = input as IOdspCreateContainerParams & {
 		createShareLinkType?: ISharingLinkKind;
 	} & (
 			| {
@@ -257,7 +259,7 @@ export class OdspDriverUrlResolver implements IUrlResolver {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 			const fileName: string = request.headers[DriverHeader.createNew].fileName;
 			const driveID = searchParams.get("driveId");
-			// Be carefully here - this is filePath (see createOdspCreateContainerRequest()), not dataStorePath (see createOdspUrl())
+			// This is filePath (see createOdspCreateContainerRequest()), not dataStorePath (see createOdspUrl())!
 			const filePath = searchParams.get("path");
 			const packageName = searchParams.get("containerPackageName");
 			// eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- false positive
@@ -372,8 +374,7 @@ export function decodeOdspUrl(url: string): {
 	driveId: string;
 	itemId: string;
 	/**
-	 * Note - path is the OdspFluidDataStoreLocator.dataStorePath !
-	 * Not filePath
+	 * This is not filePath, this is maps to OdspFluidDataStoreLocator.dataStorePath !
 	 */
 	path: string;
 	containerPackageName?: string;

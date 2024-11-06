@@ -69,7 +69,7 @@ export interface OdspConnectionConfig {
 }
 
 // @alpha
-export type OdspContainerAttachFunctor = (fileLocation?: IOdspCreateFileLocation) => Promise<OdspContainerAttachResult>;
+export type OdspContainerAttachFunctor = (fileLocation?: IOdspCreateContainerLocation) => Promise<OdspContainerAttachResult>;
 
 // @alpha
 export interface OdspContainerAttachResult {
