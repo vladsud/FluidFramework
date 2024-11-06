@@ -274,8 +274,7 @@ export class OdspDriverUrlResolver implements IUrlResolver {
 			const createResolvedUrl = createCreateOdspResolvedUrl({
 				siteUrl: siteURL,
 				driveId: driveID,
-				filePath,
-				fileName,
+				fileLocation: { filePath, fileName },
 				createShareLinkType: createKind,
 				isClpCompliantApp: request.headers?.[ClpCompliantAppHeader.isClpCompliantApp],
 			});

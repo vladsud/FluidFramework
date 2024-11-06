@@ -21,7 +21,6 @@ export type {
 	IOdspAudience,
 	OdspMember,
 	TokenResponse,
-	OdspContainerAttachArgs,
 	OdspContainerAttachFunctor,
 	OdspContainerAttachResult,
 	OdspContainerOpenOptions,

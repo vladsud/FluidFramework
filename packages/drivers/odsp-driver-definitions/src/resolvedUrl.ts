@@ -236,11 +236,49 @@ export interface IOdspOpenArgs {
 }
 
 /**
- * A set of inputs for the driver to create a new file or a FF partition on existing file.
- * @legacy
+ * Microsoft internal only! Can be used only by Microsoft applications.
+ * An input for the driver to create FF partition on existing file.
+ * Creates alternate partition with FF content.
+ * Can be only used for a files that provisioned to support FF protocol on alternate partitions.
  * @alpha
  */
-export type IOdspCreateArgs = {
+export interface IOdspCreateAltPartition {
+	/**
+	 * {@link (IOdspUrlParts:interface).itemId}
+	 */
+	itemId: string;
+}
+
+/**
+ * An inputs for the driver to create FF partition on existing file.
+ * @alpha
+ */
+export interface IOdspCreateNewFile {
+	/**
+	 * Path to a file within site. If not provided, files will be created in the root of the collection.
+	 */
+	filePath?: string;
+
+	/**
+	 * Please see {@link (IOdspResolvedUrl:interface).fileName} for more details.
+	 * If a file with such name exists, file with different name is created - Sharepoint will
+	 * add (2), (3), ... to file name to make it unique and avoid conflict on creation.
+	 */
+	fileName: string;
+}
+
+/**
+ * Identifies location of Fluid container within ODSP driver when creating container.
+ * Fluid container could be created via creating new file, or via creating alternate partition within existing file.
+ * @alpha
+ */
+export type IOdspCreateFileLocation = IOdspCreateAltPartition | IOdspCreateNewFile;
+
+/**
+ * A set of inputs for the driver to create a new file or a FF partition on existing file.
+ * @alpha
+ */
+export interface IOdspCreateArgs {
 	/**
 	 * {@inheritDoc (IOdspUrlParts:interface).siteUrl}
 	 */
@@ -251,32 +289,15 @@ export type IOdspCreateArgs = {
 	 */
 	driveId: string;
 
+	fileLocation: IOdspCreateFileLocation;
+
 	/**
 	 * {@inheritDoc (IOdspResolvedUrl:interface).isClpCompliantApp}
 	 */
 	isClpCompliantApp?: boolean;
-} & (
-	| {
-			/**
-			 * Microsoft internal only. Creates alternate partition with FF content.
-			 * Can be only used for a files that provisioned to support FF protocol on alternative paritions.
-			 * {@link (IOdspUrlParts:interface).itemId}
-			 */
-			itemId: string;
-	  }
-	| {
-			/**
-			 * Path to a file within site. If not provided, files will be created in the root of the collection.
-			 */
-			filePath?: string;
 
-			/**
-			 * {@inheritDoc (IOdspResolvedUrl:interface).fileName}
-			 */
-			fileName: string;
-			/**
-			 * Instructs ODSP to create a sharing link as part of file creation.
-			 */
-			createShareLinkType?: ISharingLinkKind;
-	  }
-);
+	/**
+	 * Instructs service to create a sharing link as part of file creation.
+	 */
+	createShareLinkType?: ISharingLinkKind;
+}

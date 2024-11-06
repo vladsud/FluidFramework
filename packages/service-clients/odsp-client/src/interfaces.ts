@@ -14,10 +14,11 @@ import type {
 	IFluidContainer,
 } from "@fluidframework/fluid-static";
 import type {
-	ISharingLinkKind,
-	ShareLinkInfoType,
+	// ISharingLinkKind,
+	// ShareLinkInfoType,
 	IPersistedCache,
 	HostStoragePolicy,
+	IOdspCreateFileLocation,
 } from "@fluidframework/odsp-driver-definitions/internal";
 
 import type { IOdspTokenProvider } from "./token.js";
@@ -87,38 +88,6 @@ export interface OdspClientPropsEx extends OdspClientProps {
 }
 
 /**
- * Specifies location / name of the file.
- * If no argument is provided, file with random name (uuid) will be created.
- * Please see {@link OdspContainerAttachFunctor} for more details
- * @alpha
- */
-export type OdspContainerAttachArgs =
-	| {
-			/**
-			 * The file path where Fluid containers are created. If undefined, the file is created at the root.
-			 */
-			filePath?: string;
-
-			/**
-			 * The file name of the Fluid file. If undefined, the file is named with a GUID.
-			 * If a file with such name exists, file with different name is created - Sharepoint will
-			 * add (2), (3), ... to file name to make it unique and avoid conflict on creation.
-			 */
-			fileName?: string;
-
-			/**
-			 * If provided, will instrcuct Sharepoint to create a sharing link as part of file creation flow.
-			 */
-			createShareLinkType?: ISharingLinkKind;
-	  }
-	| {
-			/**
-			 * (Microsoft internal only) Files supporting FF format on alternate partition could point to existing file.
-			 */
-			itemId: string;
-	  };
-
-/**
  * An object type returned by attach call.
  * Please see {@link OdspContainerAttachFunctor} for more details
  * @alpha
@@ -128,24 +97,18 @@ export interface OdspContainerAttachResult {
 	 * An ID of the document created. This ID could be passed to future IOdspClient.getContainer() call
 	 */
 	itemId: string;
-
-	/**
-	 * If OdspContainerAttachArgs.createShareLinkType was provided as part of OdspContainerAttachArgs payload,
-	 * `shareLinkInfo` will contain sharing link information for created file.
-	 */
-	shareLinkInfo?: ShareLinkInfoType;
 }
 
 /**
  * Signature of the createFn callback returned by IOdspClient.createContainer().
  * Used to attach container to stroage (create container in storage).
- * @param param - Specifies where file should be created and how it should be named. If not provided,
+ * @param fileLocation - Specifies where Fluid container should be created and how it should be named. If not provided,
  * file with random name (uuid) will be created in the root of the drive.
  * @param options - options controlling creation.
  * @alpha
  */
 export type OdspContainerAttachFunctor = (
-	param?: OdspContainerAttachArgs,
+	fileLocation?: IOdspCreateFileLocation,
 ) => Promise<OdspContainerAttachResult>;
 
 /**

@@ -69,21 +69,11 @@ export interface OdspConnectionConfig {
 }
 
 // @alpha
-export type OdspContainerAttachArgs = {
-    filePath?: string;
-    fileName?: string;
-    createShareLinkType?: ISharingLinkKind;
-} | {
-    itemId: string;
-};
-
-// @alpha
-export type OdspContainerAttachFunctor = (param?: OdspContainerAttachArgs) => Promise<OdspContainerAttachResult>;
+export type OdspContainerAttachFunctor = (fileLocation?: IOdspCreateFileLocation) => Promise<OdspContainerAttachResult>;
 
 // @alpha
 export interface OdspContainerAttachResult {
     itemId: string;
-    shareLinkInfo?: ShareLinkInfoType;
 }
 
 // @alpha

@@ -39,6 +39,7 @@ import type {
 	OdspResourceTokenFetchOptions,
 	IOdspOpenArgs,
 	IOdspCreateArgs,
+	IOdspCreateFileLocation,
 } from "@fluidframework/odsp-driver-definitions/internal";
 import { wrapConfigProviderWithDefaults } from "@fluidframework/telemetry-utils/internal";
 import { v4 as uuid } from "uuid";
@@ -47,7 +48,6 @@ import type {
 	TokenResponse,
 	OdspClientProps,
 	OdspClientPropsEx,
-	OdspContainerAttachArgs,
 	OdspContainerAttachFunctor,
 	OdspContainerServices,
 	OdspContainerAttachResult,
@@ -305,7 +305,7 @@ class OdspClientCore implements IOdspClient {
 		/**
 		 * See {@link FluidContainer.attach}
 		 */
-		return async (odspProps?: OdspContainerAttachArgs): Promise<OdspContainerAttachResult> => {
+		return async (odspProps?: IOdspCreateFileLocation): Promise<OdspContainerAttachResult> => {
 			if (container.attachState !== AttachState.Detached) {
 				throw new Error("Cannot attach container. Container is not in detached state");
 			}
@@ -315,19 +315,17 @@ class OdspClientCore implements IOdspClient {
 				driveId: connectionConfig.driveId,
 				isClpCompliantApp: connectionConfig.isClpCompliant === true,
 			};
-
-			const resolved: IOdspCreateArgs =
+			const fileLocation =
 				odspProps !== undefined && "itemId" in odspProps
 					? {
-							...base,
 							itemId: odspProps.itemId,
 						}
 					: {
-							...base,
 							filePath: odspProps?.filePath ?? "",
 							fileName: odspProps?.fileName ?? uuid(),
-							createShareLinkType: odspProps?.createShareLinkType,
 						};
+
+			const resolved: IOdspCreateArgs = { ...base, fileLocation };
 
 			resolver.update(resolved);
 
@@ -343,7 +341,6 @@ class OdspClientCore implements IOdspClient {
 
 			return {
 				itemId: resolvedUrl.itemId,
-				shareLinkInfo: resolvedUrl.shareLinkInfo,
 			};
 		};
 	}

@@ -59,19 +59,6 @@ export interface IFileEntry {
 }
 
 // @alpha
-export type IOdspCreateArgs = {
-    siteUrl: string;
-    driveId: string;
-    isClpCompliantApp?: boolean;
-} & ({
-    itemId: string;
-} | {
-    filePath?: string;
-    fileName: string;
-    createShareLinkType?: ISharingLinkKind;
-});
-
-// @alpha
 export interface IOdspError extends Omit<IDriverErrorBase, "errorType">, IOdspErrorAugmentations {
     // (undocumented)
     readonly errorType: OdspErrorTypes;
