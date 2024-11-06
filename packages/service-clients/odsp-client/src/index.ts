@@ -20,6 +20,10 @@ export type {
 	IOdspAudience,
 	OdspMember,
 	TokenResponse,
+	OdspContainerAttachArgs,
+	OdspContainerAttachFunctor,
+	OdspContainerAttachResult,
+	OdspContainerOpenOptions,
 } from "./interfaces.js";
 export { OdspClient } from "./odspClient.js";
 export { type IOdspTokenProvider } from "./token.js";

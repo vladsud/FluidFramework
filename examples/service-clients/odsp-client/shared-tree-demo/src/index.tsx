@@ -4,6 +4,9 @@
  */
 
 import type { IFluidContainer } from "fluid-framework";
+import { assert } from "@fluidframework/core-utils/internal";
+// eslint-disable-next-line import/no-internal-modules
+import { OdspContainerAttachFunctor } from "@fluidframework/odsp-client/internal";
 import React from "react";
 import ReactDOM from "react-dom";
 
@@ -24,9 +27,10 @@ async function start(): Promise<void> {
 	let itemId: string = location.hash.slice(1);
 	const createNew = itemId.length === 0;
 	let container: IFluidContainer<typeof containerSchema>;
+	let createFn: OdspContainerAttachFunctor | undefined;
 
 	if (createNew) {
-		({ container } = await createFluidData(containerSchema));
+		({ container, createFn } = await createFluidData(containerSchema));
 	} else {
 		({ container } = await loadFluidData(itemId, containerSchema));
 	}
@@ -85,7 +89,9 @@ async function start(): Promise<void> {
 
 		// If the app is in a `createNew` state - no itemId, and the container is detached, we attach the container.
 		// This uploads the container to the service and connects to the collaboration session.
-		itemId = await container.attach({ filePath: "foo/bar", fileName: "shared-tree-demo" });
+		assert(createFn !== undefined, "createFn is undefined");
+		const res = await createFn({ filePath: "foo/bar", fileName: "shared-tree-demo" });
+		itemId = res.itemId;
 
 		// The newly attached container is given a unique ID that can be used to access the container in another session
 		// eslint-disable-next-line require-atomic-updates

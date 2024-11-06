@@ -36,9 +36,9 @@ export async function createFluidData<T extends ContainerSchema>(
 }> {
 	// The client will create a new detached container using the schema
 	// A detached container will enable the app to modify the container before attaching it to the client
-	const { container, services } = await client.createContainer(schema);
+	const { container, services, createFn } = await client.createContainer(schema);
 
-	return { services, container };
+	return { services, container, createFn };
 }
 
 export const containerSchema = {
