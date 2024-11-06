@@ -137,7 +137,6 @@ export function createOdspClient(
 		siteUrl,
 		tokenProvider: new OdspTestTokenProvider(credentials),
 		driveId,
-		filePath: "",
 	};
 	const getLogger = (): ITelemetryBaseLogger | undefined => {
 		const testLogger = getTestLogger?.();

@@ -66,7 +66,6 @@ export interface OdspContainerAttachProps {
 	/**
 	 * The file path where Fluid containers are created. If undefined, the file is created at the root.
 	 */
-	filePath: string | undefined;
 
 	/**
 	 * The file name of the Fluid file. If undefined, the file is named with a GUID.

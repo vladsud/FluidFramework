@@ -23,7 +23,6 @@ const connectionConfig: OdspConnectionConfig = {
 	tokenProvider: new OdspTestTokenProvider(props.clientId),
 	siteUrl: props.siteUrl,
 	driveId: props.driveId,
-	filePath: "",
 };
 
 export const clientProps: OdspClientProps = {
