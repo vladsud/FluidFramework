@@ -28,12 +28,16 @@ export type CompatibilityMode = "1" | "2";
 
 /**
  * A mapping of string identifiers to instantiated `DataObject`s or `SharedObject`s.
+ *
+ * @beta @legacy
  */
 export type LoadableObjectRecord = Record<string, IFluidLoadable>;
 
 /**
  * A mapping of string identifiers to classes that will later be used to instantiate a corresponding `DataObject`
  * or `SharedObject`.
+ *
+ * @public
  */
 export type LoadableObjectKindRecord = Record<string, SharedObjectKind>;
 
@@ -87,7 +91,7 @@ export interface ContainerSchema {
 	 * }
 	 * ```
 	 */
-	readonly initialObjects: Record<string, SharedObjectKind>;
+	readonly initialObjects: LoadableObjectKindRecord;
 
 	/**
 	 * Loadable objects that can be created after the initial {@link IFluidContainer | Container} creation.
@@ -123,6 +127,8 @@ export interface TreeContainerSchema extends ContainerSchema {
 /**
  * Holds the collection of objects that the container was initially created with.
  * Additionally provides the ability to dynamically create further objects during usage.
+ *
+ * @legacy @beta
  */
 export interface IRootDataObject {
 	/**

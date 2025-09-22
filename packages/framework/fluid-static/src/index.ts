@@ -19,7 +19,11 @@ export {
 } from "./fluidContainer.js";
 export { createDOProviderContainerRuntimeFactory } from "./rootDataObject.js";
 export { createServiceAudience } from "./serviceAudience.js";
-export { createTreeContainerRuntimeFactory } from "./treeRootDataObject.js";
+export {
+	createTreeContainerRuntimeFactory,
+	TreeRootDataObjectFactory,
+	TreeRootDataObject,
+} from "./treeRootDataObject.js";
 export type {
 	CompatibilityMode,
 	ContainerSchema,
@@ -31,5 +35,8 @@ export type {
 	MemberChangedListener,
 	Myself,
 	TreeContainerSchema,
+	IRootDataObject,
+	LoadableObjectKindRecord,
+	LoadableObjectRecord,
 } from "./types.js";
 export { isTreeContainerSchema } from "./utils.js";

@@ -7,11 +7,11 @@ import {
 	BaseContainerRuntimeFactory,
 	TreeDataObject,
 	TreeDataObjectFactory,
+	type DataObjectTypes,
 } from "@fluidframework/aqueduct/internal";
 import type { IDataObjectProps } from "@fluidframework/aqueduct/internal";
 import type { IRuntimeFactory } from "@fluidframework/container-definitions/internal";
 import {
-	FluidDataStoreRegistry,
 	type IContainerRuntimeOptions,
 	type MinimumVersionForCollab,
 } from "@fluidframework/container-runtime/internal";
@@ -26,7 +26,7 @@ import type {
 } from "@fluidframework/core-interfaces";
 import { assert } from "@fluidframework/core-utils/internal";
 import type { IChannelFactory } from "@fluidframework/datastore-definitions/internal";
-import type { IFluidDataStoreRegistry } from "@fluidframework/runtime-definitions/internal";
+import type { NamedFluidDataStoreRegistryEntries } from "@fluidframework/runtime-definitions/internal";
 import type { SharedObjectKind } from "@fluidframework/shared-object-base/internal";
 
 import { compatibilityModeRuntimeOptions } from "./compatibilityConfiguration.js";
@@ -61,9 +61,11 @@ import {
  *
  * @remarks
  * Abstracts the dynamic code required to build a Fluid Container into a static representation for end customers.
+ *
+ * @legacy @beta
  */
-class TreeRootDataObject extends TreeDataObject implements IRootDataObject {
-	public constructor(props: IDataObjectProps) {
+export class TreeRootDataObject<TDataObjectTypes extends DataObjectTypes = DataObjectTypes> extends TreeDataObject<TDataObjectTypes> implements IRootDataObject {
+	public constructor(props: IDataObjectProps<TDataObjectTypes>) {
 		super(props);
 	}
 
@@ -94,10 +96,15 @@ class TreeRootDataObject extends TreeDataObject implements IRootDataObject {
 	}
 }
 
+/**
+ * Alias (name) of root data store.
+ * WARNING: This string is serialized as part of file format, changing it will break existing files and processes.
+ */
 const treeRootDataStoreId = "treeRootDOId";
 
 /**
  * Type of the {@link TreeRootDataObject}.
+ * WARNING: This string is serialized as part of file format, changing it will break existing files and processes.
  * @remarks Used in the PureDataObjectFactory to create the root data object.
  */
 const treeRootDataObjectType = "treeRootDO";
@@ -154,7 +161,7 @@ class TreeContainerRuntimeFactory extends BaseContainerRuntimeFactory {
 		this.#treeRootDataObjectFactory = treeRootDataObjectFactory;
 	}
 
-	protected async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
+	protected override async containerInitializingFirstTime(runtime: IContainerRuntime): Promise<void> {
 		// The first time we create the container we create the RootDataObject
 		await this.#treeRootDataObjectFactory.createRootInstance(treeRootDataStoreId, runtime);
 	}
@@ -162,32 +169,20 @@ class TreeContainerRuntimeFactory extends BaseContainerRuntimeFactory {
 
 /**
  * Factory that creates instances of a tree-based root data object.
+ *
+ * @legacy @beta
  */
-class TreeRootDataObjectFactory extends TreeDataObjectFactory<TreeRootDataObject> {
+export class TreeRootDataObjectFactory extends TreeDataObjectFactory<TreeRootDataObject> {
 	public constructor(
 		sharedObjects: readonly IChannelFactory[] = [],
-		private readonly dataStoreRegistry: IFluidDataStoreRegistry,
+		registryEntries: NamedFluidDataStoreRegistryEntries,
 	) {
-		type Ctor = new (props: IDataObjectProps) => TreeRootDataObject;
-		const ctor: Ctor = function (_props) {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-			return new TreeRootDataObject({
-				..._props,
-				// Add any additional injected properties here
-			});
-		} as unknown as Ctor;
-
-		// Note: we're not specifying registry entries to the base class, so it won't create a registry itself,
-		// and instead we override the necessary methods in this class to use the registry received in the constructor.
 		super({
 			type: treeRootDataObjectType,
-			ctor,
+			ctor: TreeRootDataObject,
 			sharedObjects,
+			registryEntries,
 		});
-	}
-
-	public get IFluidDataStoreRegistry(): IFluidDataStoreRegistry {
-		return this.dataStoreRegistry;
 	}
 }
 
@@ -213,11 +208,6 @@ export function createTreeContainerRuntimeFactory(props: {
 	 */
 	readonly compatibilityMode: CompatibilityMode;
 	/**
-	 * Optional registry of data stores to pass to the DataObject factory.
-	 * If not provided, one will be created based on the schema.
-	 */
-	readonly rootDataStoreRegistry?: IFluidDataStoreRegistry;
-	/**
 	 * Optional overrides for the container runtime options.
 	 * If not provided, only the default options for the given compatibilityMode will be used.
 	 */
@@ -229,21 +219,28 @@ export function createTreeContainerRuntimeFactory(props: {
 	 * This is useful when runtime options are overridden and change the minimum version for collab.
 	 */
 	readonly minVersionForCollabOverride?: MinimumVersionForCollab;
+
+	/*
+	 Options override for a factory
+	*/
+	readonly rootFactory?: new (
+		sharedObjects: readonly IChannelFactory[],
+		registryEntries: NamedFluidDataStoreRegistryEntries,
+	) => TreeRootDataObjectFactory;
 }): IRuntimeFactory {
 	const {
 		compatibilityMode,
 		minVersionForCollabOverride,
-		rootDataStoreRegistry,
 		runtimeOptionOverrides,
 		schema,
+		rootFactory = TreeRootDataObjectFactory,
 	} = props;
 
 	const [registryEntries, sharedObjects] = parseDataObjectsFromSharedObjects(schema);
-	const registry = rootDataStoreRegistry ?? new FluidDataStoreRegistry(registryEntries);
 
 	return new TreeContainerRuntimeFactory(
 		compatibilityMode,
-		new TreeRootDataObjectFactory(sharedObjects, registry),
+		new rootFactory(sharedObjects, registryEntries),
 		{
 			runtimeOptions: runtimeOptionOverrides,
 			minVersionForCollab: minVersionForCollabOverride,

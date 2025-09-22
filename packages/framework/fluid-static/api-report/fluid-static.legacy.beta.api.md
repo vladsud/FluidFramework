@@ -13,16 +13,16 @@ export type ContainerAttachProps<T = unknown> = T;
 // @public
 export interface ContainerSchema {
     readonly dynamicObjectTypes?: readonly SharedObjectKind[];
-    readonly initialObjects: Record<string, SharedObjectKind>;
+    readonly initialObjects: LoadableObjectKindRecord;
 }
 
 // @beta @legacy
 export function createTreeContainerRuntimeFactory(props: {
     readonly schema: TreeContainerSchema;
     readonly compatibilityMode: CompatibilityMode;
-    readonly rootDataStoreRegistry?: IFluidDataStoreRegistry;
     readonly runtimeOptionOverrides?: Partial<IContainerRuntimeOptions>;
     readonly minVersionForCollabOverride?: MinimumVersionForCollab;
+    readonly rootFactory?: new (sharedObjects: readonly IChannelFactory[], registryEntries: NamedFluidDataStoreRegistryEntries) => TreeRootDataObjectFactory;
 }): IRuntimeFactory;
 
 // @public
@@ -65,6 +65,13 @@ export type InitialObjects<T extends ContainerSchema> = {
     [K in keyof T["initialObjects"]]: T["initialObjects"][K] extends SharedObjectKind<infer TChannel> ? TChannel : never;
 };
 
+// @beta @legacy
+export interface IRootDataObject {
+    create<T>(objectClass: SharedObjectKind<T>): Promise<T>;
+    readonly initialObjects: LoadableObjectRecord;
+    uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
+}
+
 // @public
 export interface IServiceAudience<M extends IMember> extends IEventProvider<IServiceAudienceEvents<M>> {
     getMembers(): ReadonlyMap<string, M>;
@@ -82,6 +89,12 @@ export interface IServiceAudienceEvents<M extends IMember> extends IEvent {
 }
 
 // @public
+export type LoadableObjectKindRecord = Record<string, SharedObjectKind>;
+
+// @beta @legacy
+export type LoadableObjectRecord = Record<string, IFluidLoadable>;
+
+// @public
 export type MemberChangedListener<M extends IMember> = (clientId: string, member: M) => void;
 
 // @public
@@ -95,6 +108,24 @@ export interface TreeContainerSchema extends ContainerSchema {
     readonly initialObjects: {
         readonly tree: SharedObjectKind<ITree>;
     };
+}
+
+// @beta @legacy
+export class TreeRootDataObject extends TreeDataObject implements IRootDataObject {
+    constructor(props: IDataObjectProps);
+    // (undocumented)
+    create<T>(objectClass: SharedObjectKind<T>): Promise<T>;
+    // (undocumented)
+    get initialObjects(): LoadableObjectRecord;
+    // (undocumented)
+    get TreeRootDataObject(): TreeRootDataObject;
+    // (undocumented)
+    uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
+}
+
+// @beta @legacy
+export class TreeRootDataObjectFactory extends TreeDataObjectFactory<TreeRootDataObject> {
+    constructor(sharedObjects: readonly IChannelFactory<unknown>[] | undefined, registryEntries: NamedFluidDataStoreRegistryEntries);
 }
 
 ```

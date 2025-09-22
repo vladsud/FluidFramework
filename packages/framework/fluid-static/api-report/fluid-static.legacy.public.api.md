@@ -13,7 +13,7 @@ export type ContainerAttachProps<T = unknown> = T;
 // @public
 export interface ContainerSchema {
     readonly dynamicObjectTypes?: readonly SharedObjectKind[];
-    readonly initialObjects: Record<string, SharedObjectKind>;
+    readonly initialObjects: LoadableObjectKindRecord;
 }
 
 // @public
@@ -71,6 +71,9 @@ export interface IServiceAudienceEvents<M extends IMember> extends IEvent {
     // @eventProperty
     (event: "memberRemoved", listener: MemberChangedListener<M>): void;
 }
+
+// @public
+export type LoadableObjectKindRecord = Record<string, SharedObjectKind>;
 
 // @public
 export type MemberChangedListener<M extends IMember> = (clientId: string, member: M) => void;
